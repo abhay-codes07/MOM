@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MOM - Phase 3</title>
+    <title>MOM - Phase 4</title>
     <style>
       :root {
         --bg: #f4f1ea;
@@ -55,7 +55,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>MOM - Phase 3</h1>
+      <h1>MOM - Phase 4</h1>
       <div class="card">
         <h3>0) Calendar-Linked Start (Phase 3)</h3>
         <input id="ownerEmail" placeholder="Calendar owner email" />
@@ -90,17 +90,31 @@
       </div>
 
       <div class="card">
-        <h3>4) Generate Insights</h3>
+        <h3>4) Live Transcription (Phase 4)</h3>
+        <input id="txLanguage" placeholder="Language (default: en-US)" />
+        <input id="txProvider" placeholder="Provider (default: mock-realtime)" />
+        <button id="txStartBtn">Start Transcription</button>
+        <textarea id="txChunk" rows="3" placeholder="Chunk text. Example: Abhay: Action: send checklist by Friday"></textarea>
+        <button id="txChunkBtn">Ingest Chunk</button>
+        <input id="txPreset" placeholder="Simulation preset: daily-standup | planning" />
+        <button id="txSimBtn">Simulate Live Stream</button>
+        <button id="txStatusBtn">View Transcript</button>
+        <button id="txExportBtn">Export Transcript JSON</button>
+        <button id="txStopBtn">Stop Transcription</button>
+      </div>
+
+      <div class="card">
+        <h3>5) Generate Insights</h3>
         <button id="insightsBtn">Generate Insights</button>
       </div>
 
       <div class="card">
-        <h3>5) End Meeting + Generate MoM</h3>
+        <h3>6) End Meeting + Generate MoM</h3>
         <button id="endBtn">End Meeting</button>
       </div>
 
       <div class="card">
-        <h3>6) Send MoM</h3>
+        <h3>7) Send MoM</h3>
         <input id="fromEmail" placeholder="Your sender email" />
         <button id="sendBtn">Send MoM</button>
       </div>
@@ -199,6 +213,70 @@
           if (!meetingId) throw new Error("Start a meeting first");
           const data = await callApi(`/api/meetings/${meetingId}/insights`, "POST");
           setStatus({ insights: data.insights });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("txStartBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const language = document.getElementById("txLanguage").value.trim();
+          const provider = document.getElementById("txProvider").value.trim();
+          const data = await callApi(`/api/meetings/${meetingId}/transcription/start`, "POST", { language, provider });
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("txChunkBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const text = document.getElementById("txChunk").value.trim();
+          const data = await callApi(`/api/meetings/${meetingId}/transcription/chunks`, "POST", { text, source: "ui_live" });
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("txSimBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const preset = document.getElementById("txPreset").value.trim() || "daily-standup";
+          const data = await callApi(`/api/meetings/${meetingId}/transcription/simulate`, "POST", { preset, intervalMs: 1000 });
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("txStopBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/transcription/stop`, "POST");
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("txStatusBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/transcription`, "GET");
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("txExportBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/transcription/export?format=json`, "GET");
+          setStatus(data);
         } catch (e) {
           setStatus(e.message);
         }
