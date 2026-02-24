@@ -2,6 +2,8 @@
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
+const { detectPlatform, getSupportedPlatforms, listMockCalendarEvents } = require("./platform");
+const { registerPresence, getAttendanceSummary } = require("./attendance");
 require("dotenv").config();
 
 const app = express();
@@ -15,6 +17,30 @@ const meetings = new Map();
 
 function normalizeSentence(text) {
   return text.replace(/\s+/g, " ").trim();
+}
+
+function normalizeAttendees(attendees) {
+  return attendees.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean);
+}
+
+function createMeeting({ title, attendees, meetingLink = "", platform, source = "manual" }) {
+  return {
+    id: uuidv4(),
+    title,
+    attendees: normalizeAttendees(attendees),
+    platform: platform || detectPlatform(meetingLink),
+    meetingLink,
+    source,
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    isActive: true,
+    notes: [],
+    insights: null,
+    mom: null,
+    presenceEvents: [],
+    attendanceMap: new Map(),
+    discoveredAttendees: new Set()
+  };
 }
 
 function extractInsights(notes) {
@@ -70,8 +96,17 @@ function extractInsights(notes) {
   };
 }
 
+function formatMeetingResponse(meeting) {
+  return {
+    ...meeting,
+    attendanceMap: Array.from(meeting.attendanceMap.values()),
+    discoveredAttendees: Array.from(meeting.discoveredAttendees.values())
+  };
+}
+
 function generateMom(meeting) {
   const insights = meeting.insights || extractInsights(meeting.notes);
+  const attendance = getAttendanceSummary(meeting);
   const noteLines = meeting.notes
     .map((n, i) => `${i + 1}. [${n.timestamp}] ${n.speaker || "Participant"}: ${n.text}`)
     .join("\n");
@@ -91,6 +126,14 @@ function generateMom(meeting) {
   const speakerBlock = insights.speakerStats.length
     ? insights.speakerStats.map((s) => `- ${s.speaker}: ${s.notes} notes, ${s.words} words`).join("\n")
     : "- No speaker stats available.";
+  const attendanceBlock = attendance.participants.length
+    ? attendance.participants
+      .map((p) => `- ${p.name}${p.email ? ` (${p.email})` : ""}: joins=${p.joins}, leaves=${p.leaves}`)
+      .join("\n")
+    : "- No attendance events captured.";
+  const discoveredBlock = attendance.discoveredParticipants.length
+    ? attendance.discoveredParticipants.map((email) => `- ${email}`).join("\n")
+    : "- No extra participants discovered.";
 
   return `Minutes of Meeting
 
@@ -99,6 +142,8 @@ Meeting ID: ${meeting.id}
 Start: ${meeting.startedAt}
 End: ${meeting.endedAt}
 Attendees: ${meeting.attendees.join(", ")}
+Platform: ${meeting.platform}
+Meeting Link: ${meeting.meetingLink || "Not provided"}
 
 Executive Summary:
 ${summaryBlock}
@@ -114,6 +159,12 @@ ${actionBlock}
 
 Speaker Participation:
 ${speakerBlock}
+
+Attendance Map:
+${attendanceBlock}
+
+Auto-Discovered Participants:
+${discoveredBlock}
 
 Discussion Notes:
 ${noteLines || "No notes captured."}`;
@@ -135,29 +186,56 @@ function buildTransporter() {
   });
 }
 
+app.get("/api/integrations/platforms", (req, res) => {
+  res.json({ platforms: getSupportedPlatforms() });
+});
+
+app.get("/api/integrations/:platform/events", (req, res) => {
+  const platform = req.params.platform;
+  const valid = getSupportedPlatforms().some((x) => x.id === platform);
+  if (!valid) {
+    return res.status(400).json({ message: "Unsupported platform" });
+  }
+
+  const ownerEmail = req.query.ownerEmail || "owner@example.com";
+  const events = listMockCalendarEvents(platform, ownerEmail);
+  return res.json({ platform, events });
+});
+
+app.post("/api/integrations/start-from-event", (req, res) => {
+  const { platform, eventId, ownerEmail } = req.body;
+  if (!platform || !eventId) {
+    return res.status(400).json({ message: "platform and eventId are required" });
+  }
+
+  const events = listMockCalendarEvents(platform, ownerEmail);
+  const chosen = events.find((x) => x.eventId === eventId);
+  if (!chosen) {
+    return res.status(404).json({ message: "Calendar event not found" });
+  }
+
+  const meeting = createMeeting({
+    title: chosen.title,
+    attendees: chosen.attendees,
+    meetingLink: chosen.meetingLink,
+    platform,
+    source: "calendar"
+  });
+
+  meetings.set(meeting.id, meeting);
+  return res.status(201).json({ meeting: formatMeetingResponse(meeting), fromCalendarEvent: chosen });
+});
+
 app.post("/api/meetings/start", (req, res) => {
-  const { title, attendees } = req.body;
+  const { title, attendees, meetingLink, platform } = req.body;
 
   if (!title || !Array.isArray(attendees) || attendees.length === 0) {
     return res.status(400).json({ message: "title and attendees[] are required" });
   }
 
-  const id = uuidv4();
-  const now = new Date().toISOString();
-  const meeting = {
-    id,
-    title,
-    attendees,
-    startedAt: now,
-    endedAt: null,
-    isActive: true,
-    notes: [],
-    insights: null,
-    mom: null
-  };
-
-  meetings.set(id, meeting);
-  res.status(201).json(meeting);
+  const meeting = createMeeting({ title, attendees, meetingLink, platform, source: "manual" });
+  meetings.set(meeting.id, meeting);
+  return res.status(201).json(formatMeetingResponse(meeting));
 });
 
 app.post("/api/meetings/:id/notes", (req, res) => {
@@ -182,7 +260,67 @@ app.post("/api/meetings/:id/notes", (req, res) => {
   };
 
   meeting.notes.push(entry);
-  res.status(201).json(entry);
+  return res.status(201).json(entry);
+});
+
+app.post("/api/meetings/:id/presence", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const { name, email, action, source } = req.body;
+  if (!name && !email) {
+    return res.status(400).json({ message: "name or email is required" });
+  }
+
+  const event = registerPresence(meeting, { name, email, action, source });
+  return res.status(201).json({ event, attendance: getAttendanceSummary(meeting) });
+});
+
+app.get("/api/meetings/:id/attendance", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  return res.json({ id: meeting.id, attendance: getAttendanceSummary(meeting) });
+});
+
+app.post("/api/hooks/meeting-context", (req, res) => {
+  if (process.env.HOOK_API_KEY && req.headers["x-hook-key"] !== process.env.HOOK_API_KEY) {
+    return res.status(401).json({ message: "Invalid hook key" });
+  }
+
+  const { meetingId, participants = [], note } = req.body;
+  const meeting = meetings.get(meetingId);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  for (const participant of participants) {
+    registerPresence(meeting, {
+      name: participant.name,
+      email: participant.email,
+      action: participant.action || "join",
+      source: participant.source || "browser_hook"
+    });
+  }
+
+  if (note) {
+    meeting.notes.push({
+      id: uuidv4(),
+      text: String(note),
+      speaker: "BrowserHook",
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  return res.json({
+    id: meeting.id,
+    participantsIngested: participants.length,
+    attendance: getAttendanceSummary(meeting)
+  });
 });
 
 app.post("/api/meetings/:id/end", (req, res) => {
@@ -199,10 +337,11 @@ app.post("/api/meetings/:id/end", (req, res) => {
   meeting.insights = extractInsights(meeting.notes);
   meeting.mom = generateMom(meeting);
 
-  res.json({
+  return res.json({
     id: meeting.id,
     endedAt: meeting.endedAt,
     insights: meeting.insights,
+    attendance: getAttendanceSummary(meeting),
     mom: meeting.mom
   });
 });
@@ -218,7 +357,7 @@ app.post("/api/meetings/:id/insights", (req, res) => {
     meeting.mom = generateMom(meeting);
   }
 
-  res.json({
+  return res.json({
     id: meeting.id,
     insights: meeting.insights
   });
@@ -260,9 +399,9 @@ app.post("/api/meetings/:id/send-mom", async (req, res) => {
       text: meeting.mom
     });
 
-    res.json({ message: "MoM sent", messageId: info.messageId });
+    return res.json({ message: "MoM sent", messageId: info.messageId });
   } catch (err) {
-    res.status(500).json({ message: "Failed to send email", error: err.message });
+    return res.status(500).json({ message: "Failed to send email", error: err.message });
   }
 });
 
@@ -271,7 +410,8 @@ app.get("/api/meetings/:id", (req, res) => {
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
-  res.json(meeting);
+
+  return res.json(formatMeetingResponse(meeting));
 });
 
 app.listen(port, () => {
