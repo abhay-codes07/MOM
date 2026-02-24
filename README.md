@@ -1,6 +1,6 @@
 ﻿# MOM (Minutes of Meeting)
 
-Phase 1 MVP: start a meeting, capture live notes manually, generate Minutes of Meeting (MoM), and send MoM by email to attendees.
+Phase 2 MVP: start a meeting, capture live notes manually, generate note intelligence (summary, decisions, action items, speaker stats), generate Minutes of Meeting (MoM), and send MoM by email to attendees.
 
 ## 5-Phase Delivery Plan
 
@@ -10,7 +10,7 @@ Phase 1 MVP: start a meeting, capture live notes manually, generate Minutes of M
    - Generate basic MoM text
    - Send MoM via SMTP (or preview mode when SMTP is not set)
 
-2. Phase 2 - AI Note Intelligence
+2. Phase 2 - AI Note Intelligence (implemented)
    - Auto summarize notes into agenda, decisions, action items
    - Speaker-aware note enrichment
    - Better MoM formatting templates
@@ -60,6 +60,7 @@ npm run dev
 
 - `POST /api/meetings/start`
 - `POST /api/meetings/:id/notes`
+- `POST /api/meetings/:id/insights`
 - `POST /api/meetings/:id/end`
 - `POST /api/meetings/:id/send-mom`
 - `GET /api/meetings/:id`
