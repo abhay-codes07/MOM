@@ -515,6 +515,13 @@ app.post("/api/meetings/:id/end", (req, res) => {
 
   meeting.isActive = false;
   meeting.endedAt = new Date().toISOString();
+  if (meeting.transcription && meeting.transcription.isActive) {
+    stopTranscriptionSession(meeting.transcription);
+  }
+  if (transcriptionTimers.has(meeting.id)) {
+    clearInterval(transcriptionTimers.get(meeting.id));
+    transcriptionTimers.delete(meeting.id);
+  }
   meeting.insights = extractInsights(meeting.notes);
   meeting.mom = generateMom(meeting);
 
