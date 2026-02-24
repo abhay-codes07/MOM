@@ -437,6 +437,28 @@ app.get("/api/meetings/:id/transcription", (req, res) => {
   });
 });
 
+app.get("/api/meetings/:id/transcription/export", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.transcription) {
+    return res.status(404).json({ message: "No transcription session for this meeting" });
+  }
+
+  const format = String(req.query.format || "txt").toLowerCase();
+  if (format === "json") {
+    return res.json({
+      id: meeting.id,
+      transcription: formatMeetingResponse(meeting).transcription,
+      chunks: meeting.transcription.chunks
+    });
+  }
+
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  return res.send(buildTranscriptText(meeting.transcription));
+});
+
 app.get("/api/meetings/:id/attendance", (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
