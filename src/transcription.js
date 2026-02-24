@@ -56,9 +56,23 @@ function buildTranscriptText(session) {
     .join("\n");
 }
 
+function shouldCaptureAsNote(chunk) {
+  if (!chunk || !chunk.text) {
+    return false;
+  }
+
+  const text = chunk.text.toLowerCase();
+  if (text.length < 18) {
+    return false;
+  }
+
+  return /(agenda|decision|decide|action|todo|next step|deadline|follow up|owner)/i.test(text);
+}
+
 module.exports = {
   createTranscriptionSession,
   addTranscriptChunk,
   stopTranscriptionSession,
-  buildTranscriptText
+  buildTranscriptText,
+  shouldCaptureAsNote
 };
