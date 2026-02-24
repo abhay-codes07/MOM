@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MOM Hook</title>
+    <style>
+      body {
+        font-family: Segoe UI, sans-serif;
+        width: 300px;
+        margin: 0;
+        padding: 12px;
+      }
+      input, textarea, button {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 8px;
+      }
+      button {
+        padding: 8px;
+      }
+      #status {
+        white-space: pre-wrap;
+        margin-top: 8px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>MOM Hook</h3>
+    <input id="backend" placeholder="Backend URL (http://localhost:4000)" />
+    <input id="meetingId" placeholder="Meeting ID" />
+    <textarea id="participants" rows="4" placeholder="name,email per line"></textarea>
+    <textarea id="note" rows="3" placeholder="Optional note"></textarea>
+    <input id="hookKey" placeholder="Optional Hook API key" />
+    <button id="sendBtn">Send Context</button>
+    <div id="status">Idle</div>
+    <script src="popup.js"></script>
+  </body>
+</html>
