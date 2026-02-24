@@ -1,6 +1,6 @@
 ﻿# MOM (Minutes of Meeting)
 
-Phase 2 MVP: start a meeting, capture live notes manually, generate note intelligence (summary, decisions, action items, speaker stats), generate Minutes of Meeting (MoM), and send MoM by email to attendees.
+Phase 3 MVP: adds platform integration flows (Google Meet/Zoom/Teams), calendar-linked meeting start, participant auto-discovery with attendance mapping, and browser-extension hook ingestion.
 
 ## 5-Phase Delivery Plan
 
@@ -15,7 +15,7 @@ Phase 2 MVP: start a meeting, capture live notes manually, generate note intelli
    - Speaker-aware note enrichment
    - Better MoM formatting templates
 
-3. Phase 3 - Meeting Platform Integrations
+3. Phase 3 - Meeting Platform Integrations (implemented)
    - Google Meet / Zoom / Teams calendar-linked session start
    - Participant auto-discovery and attendance mapping
    - Browser extension hooks for meeting context
@@ -58,9 +58,22 @@ npm run dev
 
 ## API endpoints
 
+- `GET /api/integrations/platforms`
+- `GET /api/integrations/:platform/events?ownerEmail=...`
+- `POST /api/integrations/start-from-event`
 - `POST /api/meetings/start`
 - `POST /api/meetings/:id/notes`
+- `POST /api/meetings/:id/presence`
+- `GET /api/meetings/:id/attendance`
+- `POST /api/hooks/meeting-context` (uses `x-hook-key` when `HOOK_API_KEY` is set)
 - `POST /api/meetings/:id/insights`
 - `POST /api/meetings/:id/end`
 - `POST /api/meetings/:id/send-mom`
 - `GET /api/meetings/:id`
+
+## Browser extension sample (Phase 3)
+
+- Folder: `browser-extension/`
+- Load it as an unpacked extension in Chromium-based browsers.
+- Use the popup to send `participants` and optional `note` into:
+  - `POST /api/hooks/meeting-context`
