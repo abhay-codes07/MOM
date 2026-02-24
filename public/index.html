@@ -1,0 +1,159 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MOM - Phase 1</title>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --panel: #fffaf2;
+        --ink: #1f1f1f;
+        --brand: #0d6b54;
+        --border: #d9d2c3;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top left, #fff8ec, var(--bg));
+        color: var(--ink);
+      }
+      .wrap {
+        max-width: 900px;
+        margin: 24px auto;
+        padding: 16px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+      }
+      input, textarea, button {
+        width: 100%;
+        padding: 10px;
+        margin: 6px 0;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+      }
+      button {
+        background: var(--brand);
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #fff;
+        border: 1px solid var(--border);
+        padding: 10px;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>MOM - Phase 1</h1>
+      <div class="card">
+        <h3>1) Start Meeting</h3>
+        <input id="title" placeholder="Meeting title" />
+        <input id="attendees" placeholder="Attendee emails (comma separated)" />
+        <button id="startBtn">Start</button>
+      </div>
+
+      <div class="card">
+        <h3>2) Add Live Notes</h3>
+        <input id="speaker" placeholder="Speaker" />
+        <textarea id="note" rows="3" placeholder="Type note"></textarea>
+        <button id="noteBtn">Add Note</button>
+      </div>
+
+      <div class="card">
+        <h3>3) End Meeting + Generate MoM</h3>
+        <button id="endBtn">End Meeting</button>
+      </div>
+
+      <div class="card">
+        <h3>4) Send MoM</h3>
+        <input id="fromEmail" placeholder="Your sender email" />
+        <button id="sendBtn">Send MoM</button>
+      </div>
+
+      <div class="card">
+        <h3>Status</h3>
+        <pre id="status">No meeting started.</pre>
+      </div>
+    </div>
+
+    <script>
+      let meetingId = null;
+      let lastMom = "";
+      const status = document.getElementById("status");
+
+      function setStatus(msg) {
+        status.textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2);
+      }
+
+      async function callApi(path, method, body) {
+        const res = await fetch(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Request failed");
+        return data;
+      }
+
+      document.getElementById("startBtn").onclick = async () => {
+        try {
+          const title = document.getElementById("title").value.trim();
+          const attendees = document.getElementById("attendees").value.split(",").map(x => x.trim()).filter(Boolean);
+          const data = await callApi("/api/meetings/start", "POST", { title, attendees });
+          meetingId = data.id;
+          setStatus({ meetingId, startedAt: data.startedAt, attendees: data.attendees });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("noteBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const text = document.getElementById("note").value.trim();
+          const speaker = document.getElementById("speaker").value.trim();
+          const data = await callApi(`/api/meetings/${meetingId}/notes`, "POST", { text, speaker });
+          setStatus({ added: data });
+          document.getElementById("note").value = "";
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("endBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/end`, "POST");
+          lastMom = data.mom;
+          setStatus(lastMom);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("sendBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          if (!lastMom) throw new Error("End meeting first to generate MoM");
+          const fromEmail = document.getElementById("fromEmail").value.trim();
+          const data = await callApi(`/api/meetings/${meetingId}/send-mom`, "POST", { fromEmail });
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+    </script>
+  </body>
+</html>

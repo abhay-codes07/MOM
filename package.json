@@ -1,0 +1,17 @@
+﻿{
+  "name": "mom",
+  "version": "0.1.0",
+  "description": "Meeting notes and MoM sender",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.14",
+    "uuid": "^10.0.0"
+  }
+}
