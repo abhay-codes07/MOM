@@ -8,7 +8,8 @@ const {
   createTranscriptionSession,
   addTranscriptChunk,
   stopTranscriptionSession,
-  buildTranscriptText
+  buildTranscriptText,
+  shouldCaptureAsNote
 } = require("./transcription");
 require("dotenv").config();
 
@@ -329,7 +330,19 @@ app.post("/api/meetings/:id/transcription/chunks", (req, res) => {
   }
 
   const chunk = addTranscriptChunk(meeting.transcription, { text, speaker, confidence, source });
-  return res.status(201).json({ id: meeting.id, chunk });
+  let autoNote = null;
+  if (String(process.env.AUTO_NOTE_FROM_TRANSCRIPT || "true") === "true" && shouldCaptureAsNote(chunk)) {
+    autoNote = {
+      id: uuidv4(),
+      text: chunk.text,
+      speaker: chunk.speaker,
+      source: "transcription_auto",
+      timestamp: chunk.timestamp
+    };
+    meeting.notes.push(autoNote);
+  }
+
+  return res.status(201).json({ id: meeting.id, chunk, autoNoteCaptured: Boolean(autoNote), autoNote });
 });
 
 app.post("/api/meetings/:id/transcription/stop", (req, res) => {
