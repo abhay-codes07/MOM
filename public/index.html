@@ -57,6 +57,12 @@
     <div class="wrap">
       <h1>MOM - Phase 4</h1>
       <div class="card">
+        <h3>Auth (Phase 5)</h3>
+        <input id="loginEmail" placeholder="Email" />
+        <input id="loginPassword" type="password" placeholder="Password" />
+        <button id="loginBtn">Login</button>
+      </div>
+      <div class="card">
         <h3>0) Calendar-Linked Start (Phase 3)</h3>
         <input id="ownerEmail" placeholder="Calendar owner email" />
         <input id="platform" placeholder="Platform: google_meet | zoom | microsoft_teams" />
@@ -128,6 +134,7 @@
     <script>
       let meetingId = null;
       let lastMom = "";
+      let authToken = "";
       const status = document.getElementById("status");
 
       function setStatus(msg) {
@@ -135,15 +142,32 @@
       }
 
       async function callApi(path, method, body) {
+        const headers = { "Content-Type": "application/json" };
+        if (authToken) {
+          headers.Authorization = `Bearer ${authToken}`;
+        }
+
         const res = await fetch(path, {
           method,
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: body ? JSON.stringify(body) : undefined
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Request failed");
         return data;
       }
+
+      document.getElementById("loginBtn").onclick = async () => {
+        try {
+          const email = document.getElementById("loginEmail").value.trim();
+          const password = document.getElementById("loginPassword").value.trim();
+          const data = await callApi("/api/auth/login", "POST", { email, password });
+          authToken = data.token;
+          setStatus({ message: "Login successful", user: data.user });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
 
       document.getElementById("startBtn").onclick = async () => {
         try {
