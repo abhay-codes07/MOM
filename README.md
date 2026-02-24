@@ -102,6 +102,7 @@ npm run dev
 Quick terminal demo:
 
 - `powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1`
+- `powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1`
 
 ## Phase 5 flow
 
