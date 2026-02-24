@@ -1,6 +1,6 @@
 ﻿# MOM (Minutes of Meeting)
 
-Phase 3 MVP: adds platform integration flows (Google Meet/Zoom/Teams), calendar-linked meeting start, participant auto-discovery with attendance mapping, and browser-extension hook ingestion.
+Phase 4 MVP: adds live transcription lifecycle, simulated real-time transcript stream, speaker-aware auto-note capture, and transcript export while preserving Phase 3 integrations.
 
 ## 5-Phase Delivery Plan
 
@@ -20,7 +20,7 @@ Phase 3 MVP: adds platform integration flows (Google Meet/Zoom/Teams), calendar-
    - Participant auto-discovery and attendance mapping
    - Browser extension hooks for meeting context
 
-4. Phase 4 - Live Transcription and Auto Notes
+4. Phase 4 - Live Transcription and Auto Notes (implemented)
    - Real-time speech-to-text pipeline
    - Voice activity/speaker diarization
    - Automatic note capture while meeting is active
@@ -66,6 +66,12 @@ npm run dev
 - `POST /api/meetings/:id/presence`
 - `GET /api/meetings/:id/attendance`
 - `POST /api/hooks/meeting-context` (uses `x-hook-key` when `HOOK_API_KEY` is set)
+- `POST /api/meetings/:id/transcription/start`
+- `POST /api/meetings/:id/transcription/chunks`
+- `POST /api/meetings/:id/transcription/simulate`
+- `POST /api/meetings/:id/transcription/stop`
+- `GET /api/meetings/:id/transcription`
+- `GET /api/meetings/:id/transcription/export?format=txt|json`
 - `POST /api/meetings/:id/insights`
 - `POST /api/meetings/:id/end`
 - `POST /api/meetings/:id/send-mom`
@@ -77,3 +83,11 @@ npm run dev
 - Load it as an unpacked extension in Chromium-based browsers.
 - Use the popup to send `participants` and optional `note` into:
   - `POST /api/hooks/meeting-context`
+
+## Phase 4 flow
+
+1. Start meeting (manual or calendar-linked).
+2. Start transcription.
+3. Push transcript chunks manually or run simulation preset.
+4. Auto note capture runs for relevant chunks (`AUTO_NOTE_FROM_TRANSCRIPT=true`).
+5. View/export transcript, then end meeting and generate MoM.
