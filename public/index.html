@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MOM - Phase 4</title>
+    <title>MOM - Phase 5</title>
     <style>
       :root {
         --bg: #f4f1ea;
@@ -55,12 +55,18 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>MOM - Phase 4</h1>
+      <h1>MOM - Phase 5</h1>
       <div class="card">
         <h3>Auth (Phase 5)</h3>
         <input id="loginEmail" placeholder="Email" />
         <input id="loginPassword" type="password" placeholder="Password" />
         <button id="loginBtn">Login</button>
+      </div>
+      <div class="card">
+        <h3>Admin (Phase 5)</h3>
+        <button id="analyticsBtn">Get Analytics</button>
+        <button id="auditBtn">Get Audit Logs</button>
+        <button id="jobsBtn">Get Jobs</button>
       </div>
       <div class="card">
         <h3>0) Calendar-Linked Start (Phase 3)</h3>
@@ -300,6 +306,33 @@
         try {
           if (!meetingId) throw new Error("Start a meeting first");
           const data = await callApi(`/api/meetings/${meetingId}/transcription/export?format=json`, "GET");
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("analyticsBtn").onclick = async () => {
+        try {
+          const data = await callApi("/api/admin/analytics", "GET");
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("auditBtn").onclick = async () => {
+        try {
+          const data = await callApi("/api/admin/audit?limit=25", "GET");
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("jobsBtn").onclick = async () => {
+        try {
+          const data = await callApi("/api/jobs", "GET");
           setStatus(data);
         } catch (e) {
           setStatus(e.message);
