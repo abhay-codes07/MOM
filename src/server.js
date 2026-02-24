@@ -4,6 +4,12 @@ const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const { detectPlatform, getSupportedPlatforms, listMockCalendarEvents } = require("./platform");
 const { registerPresence, getAttendanceSummary } = require("./attendance");
+const {
+  createTranscriptionSession,
+  addTranscriptChunk,
+  stopTranscriptionSession,
+  buildTranscriptText
+} = require("./transcription");
 require("dotenv").config();
 
 const app = express();
@@ -39,7 +45,8 @@ function createMeeting({ title, attendees, meetingLink = "", platform, source = 
     mom: null,
     presenceEvents: [],
     attendanceMap: new Map(),
-    discoveredAttendees: new Set()
+    discoveredAttendees: new Set(),
+    transcription: null
   };
 }
 
@@ -100,7 +107,18 @@ function formatMeetingResponse(meeting) {
   return {
     ...meeting,
     attendanceMap: Array.from(meeting.attendanceMap.values()),
-    discoveredAttendees: Array.from(meeting.discoveredAttendees.values())
+    discoveredAttendees: Array.from(meeting.discoveredAttendees.values()),
+    transcription: meeting.transcription
+      ? {
+        id: meeting.transcription.id,
+        provider: meeting.transcription.provider,
+        language: meeting.transcription.language,
+        startedAt: meeting.transcription.startedAt,
+        stoppedAt: meeting.transcription.stoppedAt,
+        isActive: meeting.transcription.isActive,
+        chunkCount: meeting.transcription.chunks.length
+      }
+      : null
   };
 }
 
@@ -277,6 +295,73 @@ app.post("/api/meetings/:id/presence", (req, res) => {
 
   const event = registerPresence(meeting, { name, email, action, source });
   return res.status(201).json({ event, attendance: getAttendanceSummary(meeting) });
+});
+
+app.post("/api/meetings/:id/transcription/start", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (meeting.transcription && meeting.transcription.isActive) {
+    return res.status(400).json({ message: "Transcription already active" });
+  }
+
+  const { language, provider } = req.body || {};
+  meeting.transcription = createTranscriptionSession({ language, provider });
+  return res.status(201).json({
+    id: meeting.id,
+    transcription: formatMeetingResponse(meeting).transcription
+  });
+});
+
+app.post("/api/meetings/:id/transcription/chunks", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.transcription || !meeting.transcription.isActive) {
+    return res.status(400).json({ message: "Transcription is not active" });
+  }
+
+  const { text, speaker, confidence, source } = req.body || {};
+  if (!text) {
+    return res.status(400).json({ message: "text is required" });
+  }
+
+  const chunk = addTranscriptChunk(meeting.transcription, { text, speaker, confidence, source });
+  return res.status(201).json({ id: meeting.id, chunk });
+});
+
+app.post("/api/meetings/:id/transcription/stop", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.transcription || !meeting.transcription.isActive) {
+    return res.status(400).json({ message: "Transcription is not active" });
+  }
+
+  stopTranscriptionSession(meeting.transcription);
+  return res.json({
+    id: meeting.id,
+    transcription: formatMeetingResponse(meeting).transcription
+  });
+});
+
+app.get("/api/meetings/:id/transcription", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.transcription) {
+    return res.status(404).json({ message: "No transcription session for this meeting" });
+  }
+
+  return res.json({
+    id: meeting.id,
+    transcription: formatMeetingResponse(meeting).transcription,
+    transcript: buildTranscriptText(meeting.transcription)
+  });
 });
 
 app.get("/api/meetings/:id/attendance", (req, res) => {
