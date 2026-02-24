@@ -783,27 +783,28 @@ app.post("/api/hooks/meeting-context", (req, res) => {
 
   const collectedNotes = [];
   if (note) {
-    collectedNotes.push(String(note));
+    collectedNotes.push({ speaker: "BrowserHook", text: String(note) });
   }
   for (const item of notes) {
     if (item && String(item).trim()) {
-      collectedNotes.push(String(item).trim());
+      collectedNotes.push({ speaker: "BrowserHook", text: String(item).trim() });
     }
   }
   for (const caption of captions) {
     if (!caption || !caption.text) {
       continue;
     }
-    const speaker = caption.speaker || "Participant";
-    const text = `${speaker}: ${String(caption.text).trim()}`;
-    collectedNotes.push(text);
+    collectedNotes.push({
+      speaker: caption.speaker || "Participant",
+      text: String(caption.text).trim()
+    });
   }
 
   for (const entry of collectedNotes) {
     meeting.notes.push({
       id: uuidv4(),
-      text: entry,
-      speaker: "BrowserHook",
+      text: entry.text,
+      speaker: entry.speaker || "BrowserHook",
       timestamp: new Date().toISOString()
     });
     bump("notesCreated");
