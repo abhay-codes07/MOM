@@ -783,6 +783,43 @@ app.get("/api/admin/audit", requireAdmin, (req, res) => {
   res.json({ logs });
 });
 
+app.get("/api/admin/users", requireAdmin, (req, res) => {
+  const users = store.users.map((user) => ({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt
+  }));
+  res.json({ users });
+});
+
+app.post("/api/admin/users", requireAdmin, (req, res) => {
+  const { email, password, role } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ message: "email and password are required" });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (store.users.some((u) => u.email === normalizedEmail)) {
+    return res.status(409).json({ message: "User already exists" });
+  }
+
+  const user = createUser(normalizedEmail, password, role || "member");
+  store.users.push(user);
+  recordAudit("admin.user.created", req, null, { email: user.email, role: user.role });
+  persistState();
+
+  return res.status(201).json({
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt
+    }
+  });
+});
+
 app.get("/api/meetings/:id", (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
