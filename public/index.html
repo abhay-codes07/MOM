@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MOM - Phase 2</title>
+    <title>MOM - Phase 3</title>
     <style>
       :root {
         --bg: #f4f1ea;
@@ -55,11 +55,21 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>MOM - Phase 2</h1>
+      <h1>MOM - Phase 3</h1>
+      <div class="card">
+        <h3>0) Calendar-Linked Start (Phase 3)</h3>
+        <input id="ownerEmail" placeholder="Calendar owner email" />
+        <input id="platform" placeholder="Platform: google_meet | zoom | microsoft_teams" />
+        <button id="loadEventsBtn">Load Calendar Events</button>
+        <textarea id="eventList" rows="5" placeholder="Events will appear here"></textarea>
+        <input id="eventId" placeholder="Event ID to start from" />
+        <button id="startFromEventBtn">Start from Calendar Event</button>
+      </div>
       <div class="card">
         <h3>1) Start Meeting</h3>
         <input id="title" placeholder="Meeting title" />
         <input id="attendees" placeholder="Attendee emails (comma separated)" />
+        <input id="meetingLink" placeholder="Meeting link (Meet/Zoom/Teams)" />
         <button id="startBtn">Start</button>
       </div>
 
@@ -71,17 +81,26 @@
       </div>
 
       <div class="card">
-        <h3>3) Generate Insights</h3>
+        <h3>3) Attendance / Presence Mapping</h3>
+        <input id="presenceName" placeholder="Participant name" />
+        <input id="presenceEmail" placeholder="Participant email" />
+        <input id="presenceAction" placeholder="Action: join or leave" />
+        <button id="presenceBtn">Add Presence Event</button>
+        <button id="attendanceBtn">View Attendance Map</button>
+      </div>
+
+      <div class="card">
+        <h3>4) Generate Insights</h3>
         <button id="insightsBtn">Generate Insights</button>
       </div>
 
       <div class="card">
-        <h3>4) End Meeting + Generate MoM</h3>
+        <h3>5) End Meeting + Generate MoM</h3>
         <button id="endBtn">End Meeting</button>
       </div>
 
       <div class="card">
-        <h3>5) Send MoM</h3>
+        <h3>6) Send MoM</h3>
         <input id="fromEmail" placeholder="Your sender email" />
         <button id="sendBtn">Send MoM</button>
       </div>
@@ -116,9 +135,36 @@
         try {
           const title = document.getElementById("title").value.trim();
           const attendees = document.getElementById("attendees").value.split(",").map(x => x.trim()).filter(Boolean);
-          const data = await callApi("/api/meetings/start", "POST", { title, attendees });
+          const meetingLink = document.getElementById("meetingLink").value.trim();
+          const data = await callApi("/api/meetings/start", "POST", { title, attendees, meetingLink });
           meetingId = data.id;
-          setStatus({ meetingId, startedAt: data.startedAt, attendees: data.attendees });
+          setStatus({ meetingId, startedAt: data.startedAt, attendees: data.attendees, platform: data.platform });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("loadEventsBtn").onclick = async () => {
+        try {
+          const ownerEmail = document.getElementById("ownerEmail").value.trim() || "owner@example.com";
+          const platform = document.getElementById("platform").value.trim() || "google_meet";
+          const data = await callApi(`/api/integrations/${platform}/events?ownerEmail=${encodeURIComponent(ownerEmail)}`, "GET");
+          const formatted = data.events.map(e => `${e.eventId} | ${e.title} | ${e.startsAt} | ${e.meetingLink}`).join("\n");
+          document.getElementById("eventList").value = formatted;
+          setStatus({ loadedEvents: data.events.length, platform });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("startFromEventBtn").onclick = async () => {
+        try {
+          const ownerEmail = document.getElementById("ownerEmail").value.trim() || "owner@example.com";
+          const platform = document.getElementById("platform").value.trim() || "google_meet";
+          const eventId = document.getElementById("eventId").value.trim();
+          const data = await callApi("/api/integrations/start-from-event", "POST", { ownerEmail, platform, eventId });
+          meetingId = data.meeting.id;
+          setStatus({ meetingId, source: data.meeting.source, platform: data.meeting.platform, attendees: data.meeting.attendees });
         } catch (e) {
           setStatus(e.message);
         }
@@ -153,6 +199,29 @@
           if (!meetingId) throw new Error("Start a meeting first");
           const data = await callApi(`/api/meetings/${meetingId}/insights`, "POST");
           setStatus({ insights: data.insights });
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("presenceBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const name = document.getElementById("presenceName").value.trim();
+          const email = document.getElementById("presenceEmail").value.trim();
+          const action = document.getElementById("presenceAction").value.trim() || "join";
+          const data = await callApi(`/api/meetings/${meetingId}/presence`, "POST", { name, email, action, source: "ui_manual" });
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("attendanceBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/attendance`, "GET");
+          setStatus(data);
         } catch (e) {
           setStatus(e.message);
         }
