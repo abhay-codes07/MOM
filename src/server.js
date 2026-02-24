@@ -13,12 +13,110 @@ app.use(express.static("public"));
 
 const meetings = new Map();
 
+function normalizeSentence(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function extractInsights(notes) {
+  const summary = [];
+  const agenda = [];
+  const decisions = [];
+  const actionItems = [];
+  const speakerStatsMap = new Map();
+
+  for (const note of notes) {
+    const speaker = note.speaker || "Participant";
+    const text = normalizeSentence(note.text || "");
+    if (!text) {
+      continue;
+    }
+
+    const words = text.split(" ").filter(Boolean).length;
+    const speakerStats = speakerStatsMap.get(speaker) || { speaker, notes: 0, words: 0 };
+    speakerStats.notes += 1;
+    speakerStats.words += words;
+    speakerStatsMap.set(speaker, speakerStats);
+
+    if (summary.length < 5) {
+      summary.push(`${speaker}: ${text}`);
+    }
+
+    if (agenda.length < 5 && /^agenda[:\s-]/i.test(text)) {
+      agenda.push(text.replace(/^agenda[:\s-]*/i, ""));
+    }
+
+    if (/(we (decided|agree)|decision|approved|finalized|go with)/i.test(text)) {
+      decisions.push(`${speaker}: ${text}`);
+    }
+
+    if (/^(action|todo)[:\s-]/i.test(text) || /(follow up|will|needs to|should)/i.test(text)) {
+      actionItems.push({
+        owner: speaker,
+        item: text.replace(/^(action|todo)[:\s-]*/i, ""),
+        status: "open"
+      });
+    }
+  }
+
+  const speakerStats = Array.from(speakerStatsMap.values()).sort((a, b) => b.notes - a.notes);
+  const dedup = (items, limit) => Array.from(new Set(items)).slice(0, limit);
+
+  return {
+    summary: dedup(summary, 6),
+    agenda: dedup(agenda, 6),
+    decisions: dedup(decisions, 8),
+    actionItems: actionItems.slice(0, 12),
+    speakerStats
+  };
+}
+
 function generateMom(meeting) {
+  const insights = meeting.insights || extractInsights(meeting.notes);
   const noteLines = meeting.notes
     .map((n, i) => `${i + 1}. [${n.timestamp}] ${n.speaker || "Participant"}: ${n.text}`)
     .join("\n");
 
-  return `Minutes of Meeting\n\nTitle: ${meeting.title}\nMeeting ID: ${meeting.id}\nStart: ${meeting.startedAt}\nEnd: ${meeting.endedAt}\nAttendees: ${meeting.attendees.join(", ")}\n\nDiscussion Notes:\n${noteLines || "No notes captured."}\n\nAction Items:\n- Add AI summarization and action item extraction in Phase 2.`;
+  const summaryBlock = insights.summary.length
+    ? insights.summary.map((line) => `- ${line}`).join("\n")
+    : "- No summary available.";
+  const agendaBlock = insights.agenda.length
+    ? insights.agenda.map((line) => `- ${line}`).join("\n")
+    : "- Agenda was not explicitly captured.";
+  const decisionBlock = insights.decisions.length
+    ? insights.decisions.map((line) => `- ${line}`).join("\n")
+    : "- No explicit decisions detected.";
+  const actionBlock = insights.actionItems.length
+    ? insights.actionItems.map((item) => `- ${item.item} (Owner: ${item.owner}, Status: ${item.status})`).join("\n")
+    : "- No action items detected.";
+  const speakerBlock = insights.speakerStats.length
+    ? insights.speakerStats.map((s) => `- ${s.speaker}: ${s.notes} notes, ${s.words} words`).join("\n")
+    : "- No speaker stats available.";
+
+  return `Minutes of Meeting
+
+Title: ${meeting.title}
+Meeting ID: ${meeting.id}
+Start: ${meeting.startedAt}
+End: ${meeting.endedAt}
+Attendees: ${meeting.attendees.join(", ")}
+
+Executive Summary:
+${summaryBlock}
+
+Agenda Highlights:
+${agendaBlock}
+
+Decisions:
+${decisionBlock}
+
+Action Items:
+${actionBlock}
+
+Speaker Participation:
+${speakerBlock}
+
+Discussion Notes:
+${noteLines || "No notes captured."}`;
 }
 
 function buildTransporter() {
@@ -54,6 +152,7 @@ app.post("/api/meetings/start", (req, res) => {
     endedAt: null,
     isActive: true,
     notes: [],
+    insights: null,
     mom: null
   };
 
@@ -97,12 +196,31 @@ app.post("/api/meetings/:id/end", (req, res) => {
 
   meeting.isActive = false;
   meeting.endedAt = new Date().toISOString();
+  meeting.insights = extractInsights(meeting.notes);
   meeting.mom = generateMom(meeting);
 
   res.json({
     id: meeting.id,
     endedAt: meeting.endedAt,
+    insights: meeting.insights,
     mom: meeting.mom
+  });
+});
+
+app.post("/api/meetings/:id/insights", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  meeting.insights = extractInsights(meeting.notes);
+  if (!meeting.isActive) {
+    meeting.mom = generateMom(meeting);
+  }
+
+  res.json({
+    id: meeting.id,
+    insights: meeting.insights
   });
 });
 
