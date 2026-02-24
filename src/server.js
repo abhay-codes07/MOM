@@ -209,10 +209,7 @@ app.post("/api/integrations/start-from-event", (req, res) => {
   }
 
   const events = listMockCalendarEvents(platform, ownerEmail);
-  const chosen = events.find((x) => x.eventId === eventId);
-  if (!chosen) {
-    return res.status(404).json({ message: "Calendar event not found" });
-  }
+  const chosen = events.find((x) => x.eventId === eventId) || events[0];
 
   const meeting = createMeeting({
     title: chosen.title,
@@ -223,7 +220,11 @@ app.post("/api/integrations/start-from-event", (req, res) => {
   });
 
   meetings.set(meeting.id, meeting);
-  return res.status(201).json({ meeting: formatMeetingResponse(meeting), fromCalendarEvent: chosen });
+  return res.status(201).json({
+    meeting: formatMeetingResponse(meeting),
+    fromCalendarEvent: chosen,
+    selectedByFallback: chosen.eventId !== eventId
+  });
 });
 
 app.post("/api/meetings/start", (req, res) => {
