@@ -20,6 +20,34 @@ This mood summary appears at the top of the email body that attendees receive.
 Another new feature: **Secure Shareable MoM Link**  
 You can generate a read-only share link for each meeting MoM and open it in browser.
 
+## Why It Was Only Capturing Typed Notes
+
+Before live Meet capture is enabled, MOM records only:
+
+- notes you type in the app UI, or
+- notes manually sent by extension one-shot mode.
+
+To capture conversation live, run the Google Meet extension in **live mode** (steps below) and enable Meet captions.
+
+## Google Meet Live Capture Steps
+
+1. Start MOM app (`npm run dev`) and login.
+2. Start a meeting in MOM and copy the `meetingId`.
+3. Open Google Meet and turn on captions.
+4. Load/refresh extension from `browser-extension/`.
+5. In extension popup:
+   - backend: `http://localhost:4000`
+   - meetingId: paste your meeting id
+   - hook key: optional
+6. Click **Start Live Capture On This Tab**.
+7. Verify Meet page shows badge: `MOM RECORDING`.
+8. End meeting in MOM and generate/send MoM.
+
+Important:
+
+- Meet page usually does not expose participant emails reliably, so live email extraction is limited.
+- This extension is not an official Google Meet plugin; it overlays its own recording badge.
+
 ## Architecture
 
 - `src/server.js`: main API server and orchestration
