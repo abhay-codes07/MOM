@@ -11,6 +11,7 @@ const {
   buildTranscriptText,
   shouldCaptureAsNote
 } = require("./transcription");
+const { getPresetChunks } = require("./transcript-presets");
 require("dotenv").config();
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const meetings = new Map();
+const transcriptionTimers = new Map();
 
 function normalizeSentence(text) {
   return text.replace(/\s+/g, " ").trim();
@@ -355,9 +357,67 @@ app.post("/api/meetings/:id/transcription/stop", (req, res) => {
   }
 
   stopTranscriptionSession(meeting.transcription);
+  if (transcriptionTimers.has(meeting.id)) {
+    clearInterval(transcriptionTimers.get(meeting.id));
+    transcriptionTimers.delete(meeting.id);
+  }
   return res.json({
     id: meeting.id,
     transcription: formatMeetingResponse(meeting).transcription
+  });
+});
+
+app.post("/api/meetings/:id/transcription/simulate", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.transcription || !meeting.transcription.isActive) {
+    return res.status(400).json({ message: "Transcription is not active" });
+  }
+  if (transcriptionTimers.has(meeting.id)) {
+    return res.status(400).json({ message: "Simulation is already running for this meeting" });
+  }
+
+  const { preset, intervalMs } = req.body || {};
+  const chunks = getPresetChunks(preset);
+  let cursor = 0;
+  const stepMs = Number(intervalMs || 1200);
+
+  const timer = setInterval(() => {
+    if (!meeting.transcription || !meeting.transcription.isActive) {
+      clearInterval(timer);
+      transcriptionTimers.delete(meeting.id);
+      return;
+    }
+
+    const nextText = chunks[cursor];
+    cursor += 1;
+
+    const chunk = addTranscriptChunk(meeting.transcription, { text: nextText, source: "simulator" });
+    if (String(process.env.AUTO_NOTE_FROM_TRANSCRIPT || "true") === "true" && shouldCaptureAsNote(chunk)) {
+      meeting.notes.push({
+        id: uuidv4(),
+        text: chunk.text,
+        speaker: chunk.speaker,
+        source: "transcription_auto",
+        timestamp: chunk.timestamp
+      });
+    }
+
+    if (cursor >= chunks.length) {
+      clearInterval(timer);
+      transcriptionTimers.delete(meeting.id);
+    }
+  }, stepMs);
+
+  transcriptionTimers.set(meeting.id, timer);
+  return res.status(202).json({
+    id: meeting.id,
+    started: true,
+    preset: preset || "daily-standup",
+    chunkCount: chunks.length,
+    intervalMs: stepMs
   });
 });
 
