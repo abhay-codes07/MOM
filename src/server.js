@@ -766,7 +766,7 @@ app.post("/api/hooks/meeting-context", (req, res) => {
     return res.status(401).json({ message: "Invalid hook key" });
   }
 
-  const { meetingId, participants = [], note } = req.body;
+  const { meetingId, participants = [], note, notes = [], captions = [] } = req.body;
   const meeting = meetings.get(meetingId);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
@@ -781,22 +781,44 @@ app.post("/api/hooks/meeting-context", (req, res) => {
     });
   }
 
+  const collectedNotes = [];
   if (note) {
+    collectedNotes.push(String(note));
+  }
+  for (const item of notes) {
+    if (item && String(item).trim()) {
+      collectedNotes.push(String(item).trim());
+    }
+  }
+  for (const caption of captions) {
+    if (!caption || !caption.text) {
+      continue;
+    }
+    const speaker = caption.speaker || "Participant";
+    const text = `${speaker}: ${String(caption.text).trim()}`;
+    collectedNotes.push(text);
+  }
+
+  for (const entry of collectedNotes) {
     meeting.notes.push({
       id: uuidv4(),
-      text: String(note),
+      text: entry,
       speaker: "BrowserHook",
       timestamp: new Date().toISOString()
     });
     bump("notesCreated");
   }
 
-  recordAudit("hook.meeting_context", req, meeting.id, { participantsIngested: participants.length });
+  recordAudit("hook.meeting_context", req, meeting.id, {
+    participantsIngested: participants.length,
+    notesIngested: collectedNotes.length
+  });
   persistState();
 
   return res.json({
     id: meeting.id,
     participantsIngested: participants.length,
+    notesIngested: collectedNotes.length,
     attendance: getAttendanceSummary(meeting)
   });
 });
