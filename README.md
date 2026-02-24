@@ -1,6 +1,6 @@
 ﻿# MOM (Minutes of Meeting)
 
-Phase 4 MVP: adds live transcription lifecycle, simulated real-time transcript stream, speaker-aware auto-note capture, and transcript export while preserving Phase 3 integrations.
+Phase 5 MVP: adds authentication, persistent storage, retryable email job queue, analytics counters, and audit logs on top of Phases 1-4.
 
 ## 5-Phase Delivery Plan
 
@@ -25,7 +25,7 @@ Phase 4 MVP: adds live transcription lifecycle, simulated real-time transcript s
    - Voice activity/speaker diarization
    - Automatic note capture while meeting is active
 
-5. Phase 5 - Production Hardening
+5. Phase 5 - Production Hardening (implemented)
    - Authentication and user accounts
    - Persistent database and job queue
    - Retryable email delivery, analytics, audit logs, cloud deployment
@@ -58,6 +58,9 @@ npm run dev
 
 ## API endpoints
 
+- `GET /api/health`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 - `GET /api/integrations/platforms`
 - `GET /api/integrations/:platform/events?ownerEmail=...`
 - `POST /api/integrations/start-from-event`
@@ -75,6 +78,10 @@ npm run dev
 - `POST /api/meetings/:id/insights`
 - `POST /api/meetings/:id/end`
 - `POST /api/meetings/:id/send-mom`
+- `GET /api/jobs` (admin)
+- `GET /api/jobs/:id` (admin)
+- `GET /api/admin/analytics` (admin)
+- `GET /api/admin/audit?limit=...` (admin)
 - `GET /api/meetings/:id`
 
 ## Browser extension sample (Phase 3)
@@ -95,3 +102,11 @@ npm run dev
 Quick terminal demo:
 
 - `powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1`
+
+## Phase 5 flow
+
+1. Login with bootstrap admin credentials from `.env` (or your configured admin user).
+2. Use the token for all API calls (`Authorization: Bearer <token>`) when `AUTH_REQUIRED=true`.
+3. End meeting to generate MoM.
+4. Queue email via `POST /api/meetings/:id/send-mom`.
+5. Track delivery and retries via `GET /api/jobs` and view system telemetry via admin analytics/audit endpoints.
