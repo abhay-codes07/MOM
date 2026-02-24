@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "MOM Meeting Context Hook",
+  "version": "0.1.0",
+  "description": "Sends meeting participants and notes to MOM backend.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://*.zoom.us/*",
+    "https://teams.microsoft.com/*"
+  ],
+  "action": {
+    "default_title": "Send Context",
+    "default_popup": "popup.html"
+  }
+}
