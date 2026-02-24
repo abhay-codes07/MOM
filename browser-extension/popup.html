@@ -27,13 +27,16 @@
     </style>
   </head>
   <body>
-    <h3>MOM Hook</h3>
-    <input id="backend" placeholder="Backend URL (http://localhost:4000)" />
-    <input id="meetingId" placeholder="Meeting ID" />
-    <textarea id="participants" rows="4" placeholder="name,email per line"></textarea>
-    <textarea id="note" rows="3" placeholder="Optional note"></textarea>
+    <h3>MOM Live Hook</h3>
+    <input id="backend" placeholder="Backend URL (http://localhost:4000)" value="http://localhost:4000" />
+    <input id="meetingId" placeholder="Meeting ID from MOM app" />
     <input id="hookKey" placeholder="Optional Hook API key" />
-    <button id="sendBtn">Send Context</button>
+    <button id="startLiveBtn">Start Live Capture On This Tab</button>
+    <button id="stopLiveBtn">Stop Live Capture</button>
+    <hr />
+    <textarea id="participants" rows="3" placeholder="Manual participants: name,email per line"></textarea>
+    <textarea id="note" rows="3" placeholder="Manual one-shot note"></textarea>
+    <button id="sendBtn">Send One-Shot Context</button>
     <div id="status">Idle</div>
     <script src="popup.js"></script>
   </body>

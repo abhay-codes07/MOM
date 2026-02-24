@@ -15,13 +15,80 @@ function parseParticipants(raw) {
     });
 }
 
+function getConfigFromUi() {
+  return {
+    backend: document.getElementById("backend").value.trim() || "http://localhost:4000",
+    meetingId: document.getElementById("meetingId").value.trim(),
+    hookKey: document.getElementById("hookKey").value.trim()
+  };
+}
+
+function setConfigToUi(config) {
+  if (!config) return;
+  document.getElementById("backend").value = config.backend || "http://localhost:4000";
+  document.getElementById("meetingId").value = config.meetingId || "";
+  document.getElementById("hookKey").value = config.hookKey || "";
+}
+
+async function getActiveTab() {
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tabs[0];
+}
+
+async function sendConfigToTab(config) {
+  const tab = await getActiveTab();
+  if (!tab || !tab.id) {
+    throw new Error("No active tab.");
+  }
+
+  if (!tab.url || !tab.url.includes("meet.google.com")) {
+    throw new Error("Open Google Meet tab first.");
+  }
+
+  const response = await chrome.tabs.sendMessage(tab.id, {
+    type: "mom:setLiveConfig",
+    payload: config
+  });
+  return response;
+}
+
+document.getElementById("startLiveBtn").addEventListener("click", async () => {
+  try {
+    const config = getConfigFromUi();
+    if (!config.meetingId) {
+      throw new Error("Meeting ID is required.");
+    }
+
+    const liveConfig = { ...config, enabled: true };
+    await chrome.storage.local.set({ mom_live_config: liveConfig });
+    await sendConfigToTab(liveConfig);
+    setStatus({ message: "Live capture enabled on current Meet tab.", meetingId: config.meetingId });
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
+document.getElementById("stopLiveBtn").addEventListener("click", async () => {
+  try {
+    const config = getConfigFromUi();
+    const liveConfig = { ...config, enabled: false };
+    await chrome.storage.local.set({ mom_live_config: liveConfig });
+    try {
+      await sendConfigToTab(liveConfig);
+    } catch (_) {
+      // ignore if tab is closed or not on meet
+    }
+    setStatus("Live capture stopped.");
+  } catch (error) {
+    setStatus(error.message);
+  }
+});
+
 document.getElementById("sendBtn").addEventListener("click", async () => {
   try {
-    const backend = document.getElementById("backend").value.trim() || "http://localhost:4000";
-    const meetingId = document.getElementById("meetingId").value.trim();
+    const { backend, meetingId, hookKey } = getConfigFromUi();
     const participants = parseParticipants(document.getElementById("participants").value);
     const note = document.getElementById("note").value.trim();
-    const hookKey = document.getElementById("hookKey").value.trim();
 
     if (!meetingId) {
       throw new Error("Meeting ID is required.");
@@ -53,4 +120,9 @@ document.getElementById("sendBtn").addEventListener("click", async () => {
   } catch (error) {
     setStatus(error.message);
   }
+});
+
+chrome.storage.local.get(["mom_live_config"], (result) => {
+  const config = result.mom_live_config || {};
+  setConfigToUi(config);
 });
