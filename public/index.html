@@ -132,6 +132,12 @@
       </div>
 
       <div class="card">
+        <h3>8) Share MoM Link (New)</h3>
+        <button id="shareCreateBtn">Create Share Link</button>
+        <button id="shareViewBtn">Get Share Link</button>
+      </div>
+
+      <div class="card">
         <h3>Status</h3>
         <pre id="status">No meeting started.</pre>
       </div>
@@ -368,6 +374,26 @@
           if (!lastMom) throw new Error("End meeting first to generate MoM");
           const fromEmail = document.getElementById("fromEmail").value.trim();
           const data = await callApi(`/api/meetings/${meetingId}/send-mom`, "POST", { fromEmail });
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("shareCreateBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/share-mom`, "POST");
+          setStatus(data);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("shareViewBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/share-mom`, "GET");
           setStatus(data);
         } catch (e) {
           setStatus(e.message);

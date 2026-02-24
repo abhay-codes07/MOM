@@ -128,6 +128,7 @@ function createMeeting({ title, attendees, meetingLink = "", platform, source = 
     notes: [],
     insights: null,
     mom: null,
+    momShare: null,
     presenceEvents: [],
     attendanceMap: new Map(),
     discoveredAttendees: new Set(),
@@ -256,6 +257,7 @@ function inferMeetingMood(notes) {
 function formatMeetingResponse(meeting) {
   return {
     ...serializeMeeting(meeting),
+    momShare: meeting.momShare,
     transcription: meeting.transcription
       ? {
         id: meeting.transcription.id,
@@ -332,6 +334,32 @@ ${attendanceBlock}
 
 Discussion Notes:
 ${noteLines || "No notes captured."}`;
+}
+
+function getMeetingByShareId(shareId) {
+  for (const meeting of meetings.values()) {
+    if (meeting.momShare?.id === shareId) {
+      return meeting;
+    }
+  }
+  return null;
+}
+
+function ensureMomShare(meeting, req) {
+  if (!meeting.momShare) {
+    meeting.momShare = {
+      id: crypto.randomBytes(16).toString("hex"),
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  const host = req.get("host");
+  const protocol = req.protocol || "http";
+  const url = `${protocol}://${host}/share/mom/${meeting.momShare.id}`;
+  return {
+    ...meeting.momShare,
+    url
+  };
 }
 
 function buildTransporter() {
@@ -704,6 +732,35 @@ app.get("/api/meetings/:id/attendance", (req, res) => {
   return res.json({ id: meeting.id, attendance: getAttendanceSummary(meeting) });
 });
 
+app.post("/api/meetings/:id/share-mom", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.mom) {
+    return res.status(400).json({ message: "End the meeting first to generate MoM" });
+  }
+
+  const share = ensureMomShare(meeting, req);
+  recordAudit("mom.share.created", req, meeting.id, { shareId: share.id });
+  persistState();
+
+  return res.status(201).json({ id: meeting.id, share });
+});
+
+app.get("/api/meetings/:id/share-mom", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.momShare) {
+    return res.status(404).json({ message: "Share link not generated yet" });
+  }
+
+  const share = ensureMomShare(meeting, req);
+  return res.json({ id: meeting.id, share });
+});
+
 app.post("/api/hooks/meeting-context", (req, res) => {
   if (process.env.HOOK_API_KEY && req.headers["x-hook-key"] !== process.env.HOOK_API_KEY) {
     return res.status(401).json({ message: "Invalid hook key" });
@@ -811,12 +868,15 @@ app.post("/api/meetings/:id/send-mom", (req, res) => {
     return res.status(400).json({ message: "fromEmail is required" });
   }
 
+  const share = ensureMomShare(meeting, req);
+  const emailText = `${meeting.mom}\n\nShared MoM Link: ${share.url}`;
+
   const job = createEmailJob({
     meetingId: meeting.id,
     fromEmail,
     to: meeting.attendees,
     subject: `Minutes of Meeting: ${meeting.title}`,
-    text: meeting.mom,
+    text: emailText,
     maxRetries: Number(process.env.EMAIL_JOB_MAX_RETRIES || 3)
   });
 
@@ -896,6 +956,43 @@ app.get("/api/meetings/:id", (req, res) => {
   }
 
   return res.json(formatMeetingResponse(meeting));
+});
+
+app.get("/share/mom/:shareId", (req, res) => {
+  const meeting = getMeetingByShareId(req.params.shareId);
+  if (!meeting || !meeting.mom) {
+    return res.status(404).send("MoM share link not found.");
+  }
+
+  const safeTitle = String(meeting.title || "Meeting").replace(/[<>&]/g, "");
+  const safeMom = String(meeting.mom).replace(/[<>&]/g, "");
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoM Share - ${safeTitle}</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, sans-serif; background: #f6f7fb; color: #1d2630; }
+    .wrap { max-width: 920px; margin: 32px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #dde3ed; border-radius: 12px; padding: 20px; }
+    h1 { margin-top: 0; font-size: 22px; }
+    pre { white-space: pre-wrap; line-height: 1.5; font-size: 14px; }
+    .meta { color: #5a6a7f; font-size: 13px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>${safeTitle}</h1>
+      <div class="meta">Read-only shared Minutes of Meeting</div>
+      <pre>${safeMom}</pre>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  return res.setHeader("Content-Type", "text/html; charset=utf-8").send(html);
 });
 
 function bootstrapAdminUser() {

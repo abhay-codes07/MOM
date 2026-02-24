@@ -17,6 +17,9 @@ MOM is a full-stack meeting assistant that captures notes, generates MoM, analyz
 Every generated MoM now starts with an **Overall Meeting Mood** line.  
 This mood summary appears at the top of the email body that attendees receive.
 
+Another new feature: **Secure Shareable MoM Link**  
+You can generate a read-only share link for each meeting MoM and open it in browser.
+
 ## Architecture
 
 - `src/server.js`: main API server and orchestration
@@ -83,7 +86,13 @@ Use these only for local development (change in production):
 - `POST /api/meetings/:id/insights`
 - `POST /api/meetings/:id/end`
 - `POST /api/meetings/:id/send-mom`
+- `POST /api/meetings/:id/share-mom`
+- `GET /api/meetings/:id/share-mom`
 - `GET /api/meetings/:id`
+
+### Public Share
+
+- `GET /share/mom/:shareId` (read-only public MoM page)
 
 ### Transcription
 
