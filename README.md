@@ -111,3 +111,7 @@ Quick terminal demo:
 3. End meeting to generate MoM.
 4. Queue email via `POST /api/meetings/:id/send-mom`.
 5. Track delivery and retries via `GET /api/jobs` and view system telemetry via admin analytics/audit endpoints.
+
+Operational notes:
+
+- See `docs/PHASE5_RUNBOOK.md`.
