@@ -1,4 +1,5 @@
-﻿const express = require("express");
+﻿const crypto = require("crypto");
+const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
@@ -12,17 +13,44 @@ const {
   shouldCaptureAsNote
 } = require("./transcription");
 const { getPresetChunks } = require("./transcript-presets");
+const { createUser, verifyPassword, signAuthToken, verifyAuthToken, extractBearerToken } = require("./auth");
+const { readDb, writeDb } = require("./persistence");
+const { createAuditEvent, appendAudit } = require("./audit");
+const {
+  createEmailJob,
+  markJobProcessing,
+  markJobSuccess,
+  markJobRetry,
+  markJobFailed,
+  getNextRunnableJob
+} = require("./queue");
 require("dotenv").config();
 
 const app = express();
 const port = process.env.PORT || 4000;
+const authRequired = String(process.env.AUTH_REQUIRED || "true") === "true";
+const authSecret = process.env.AUTH_SECRET || crypto.randomBytes(32).toString("hex");
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-const meetings = new Map();
 const transcriptionTimers = new Map();
+const meetings = new Map();
+const store = {
+  users: [],
+  jobs: [],
+  auditLogs: [],
+  analytics: {
+    meetingCreated: 0,
+    meetingEnded: 0,
+    notesCreated: 0,
+    transcriptChunks: 0,
+    momsQueued: 0,
+    momsSent: 0,
+    authLogins: 0
+  }
+};
 
 function normalizeSentence(text) {
   return text.replace(/\s+/g, " ").trim();
@@ -30,6 +58,60 @@ function normalizeSentence(text) {
 
 function normalizeAttendees(attendees) {
   return attendees.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean);
+}
+
+function serializeMeeting(meeting) {
+  return {
+    ...meeting,
+    attendanceMap: Array.from(meeting.attendanceMap.values()),
+    discoveredAttendees: Array.from(meeting.discoveredAttendees.values())
+  };
+}
+
+function deserializeMeeting(raw) {
+  const attendanceArray = Array.isArray(raw.attendanceMap) ? raw.attendanceMap : [];
+  const map = new Map();
+  for (const item of attendanceArray) {
+    const key = (item.email || item.name || "participant").toLowerCase();
+    map.set(key, item);
+  }
+
+  return {
+    ...raw,
+    attendanceMap: map,
+    discoveredAttendees: new Set(Array.isArray(raw.discoveredAttendees) ? raw.discoveredAttendees : [])
+  };
+}
+
+function persistState() {
+  writeDb({
+    meetings: Array.from(meetings.values()).map(serializeMeeting),
+    users: store.users,
+    jobs: store.jobs,
+    auditLogs: store.auditLogs,
+    analytics: store.analytics
+  });
+}
+
+function loadState() {
+  const db = readDb();
+  for (const rawMeeting of db.meetings || []) {
+    meetings.set(rawMeeting.id, deserializeMeeting(rawMeeting));
+  }
+  store.users = Array.isArray(db.users) ? db.users : [];
+  store.jobs = Array.isArray(db.jobs) ? db.jobs : [];
+  store.auditLogs = Array.isArray(db.auditLogs) ? db.auditLogs : [];
+  store.analytics = { ...store.analytics, ...(db.analytics || {}) };
+}
+
+function bump(metric, count = 1) {
+  store.analytics[metric] = (store.analytics[metric] || 0) + count;
+}
+
+function recordAudit(action, req, meetingId = null, details = {}) {
+  const actor = req?.user?.email || "system";
+  const event = createAuditEvent({ actor, action, meetingId, details });
+  appendAudit(store, event);
 }
 
 function createMeeting({ title, attendees, meetingLink = "", platform, source = "manual" }) {
@@ -108,9 +190,7 @@ function extractInsights(notes) {
 
 function formatMeetingResponse(meeting) {
   return {
-    ...meeting,
-    attendanceMap: Array.from(meeting.attendanceMap.values()),
-    discoveredAttendees: Array.from(meeting.discoveredAttendees.values()),
+    ...serializeMeeting(meeting),
     transcription: meeting.transcription
       ? {
         id: meeting.transcription.id,
@@ -152,9 +232,6 @@ function generateMom(meeting) {
       .map((p) => `- ${p.name}${p.email ? ` (${p.email})` : ""}: joins=${p.joins}, leaves=${p.leaves}`)
       .join("\n")
     : "- No attendance events captured.";
-  const discoveredBlock = attendance.discoveredParticipants.length
-    ? attendance.discoveredParticipants.map((email) => `- ${email}`).join("\n")
-    : "- No extra participants discovered.";
 
   return `Minutes of Meeting
 
@@ -184,9 +261,6 @@ ${speakerBlock}
 Attendance Map:
 ${attendanceBlock}
 
-Auto-Discovered Participants:
-${discoveredBlock}
-
 Discussion Notes:
 ${noteLines || "No notes captured."}`;
 }
@@ -206,6 +280,66 @@ function buildTransporter() {
     }
   });
 }
+
+function requireAuth(req, res, next) {
+  if (!authRequired) {
+    req.user = { id: "dev", email: "dev@local", role: "admin" };
+    return next();
+  }
+
+  const token = extractBearerToken(req.headers.authorization);
+  const payload = verifyAuthToken(token, authSecret);
+  if (!payload) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const user = store.users.find((u) => u.id === payload.userId && u.email === payload.email);
+  if (!user) {
+    return res.status(401).json({ message: "User not found" });
+  }
+
+  req.user = { id: user.id, email: user.email, role: user.role };
+  return next();
+}
+
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  return next();
+}
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", authRequired, uptimeSeconds: Math.floor(process.uptime()) });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const { email, password } = req.body || {};
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const user = store.users.find((u) => u.email === normalizedEmail);
+  if (!user || !verifyPassword(user, password)) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
+
+  user.lastLoginAt = new Date().toISOString();
+  bump("authLogins");
+  const token = signAuthToken({ userId: user.id, email: user.email, role: user.role }, authSecret, 3600 * 12);
+  recordAudit("auth.login", null, null, { userEmail: user.email });
+  persistState();
+
+  return res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
+});
+
+app.use("/api", (req, res, next) => {
+  if (req.path === "/auth/login" || req.path === "/health") {
+    return next();
+  }
+  return requireAuth(req, res, next);
+});
+
+app.get("/api/auth/me", (req, res) => {
+  res.json({ user: req.user });
+});
 
 app.get("/api/integrations/platforms", (req, res) => {
   res.json({ platforms: getSupportedPlatforms() });
@@ -241,6 +375,10 @@ app.post("/api/integrations/start-from-event", (req, res) => {
   });
 
   meetings.set(meeting.id, meeting);
+  bump("meetingCreated");
+  recordAudit("meeting.start.calendar", req, meeting.id, { title: meeting.title, platform });
+  persistState();
+
   return res.status(201).json({
     meeting: formatMeetingResponse(meeting),
     fromCalendarEvent: chosen,
@@ -257,6 +395,10 @@ app.post("/api/meetings/start", (req, res) => {
 
   const meeting = createMeeting({ title, attendees, meetingLink, platform, source: "manual" });
   meetings.set(meeting.id, meeting);
+  bump("meetingCreated");
+  recordAudit("meeting.start.manual", req, meeting.id, { title: meeting.title, platform: meeting.platform });
+  persistState();
+
   return res.status(201).json(formatMeetingResponse(meeting));
 });
 
@@ -282,6 +424,10 @@ app.post("/api/meetings/:id/notes", (req, res) => {
   };
 
   meeting.notes.push(entry);
+  bump("notesCreated");
+  recordAudit("meeting.note.added", req, meeting.id, { speaker: entry.speaker });
+  persistState();
+
   return res.status(201).json(entry);
 });
 
@@ -297,6 +443,9 @@ app.post("/api/meetings/:id/presence", (req, res) => {
   }
 
   const event = registerPresence(meeting, { name, email, action, source });
+  recordAudit("meeting.presence", req, meeting.id, { name: event.name, email: event.email, action: event.action });
+  persistState();
+
   return res.status(201).json({ event, attendance: getAttendanceSummary(meeting) });
 });
 
@@ -311,6 +460,9 @@ app.post("/api/meetings/:id/transcription/start", (req, res) => {
 
   const { language, provider } = req.body || {};
   meeting.transcription = createTranscriptionSession({ language, provider });
+  recordAudit("transcription.start", req, meeting.id, { provider: meeting.transcription.provider });
+  persistState();
+
   return res.status(201).json({
     id: meeting.id,
     transcription: formatMeetingResponse(meeting).transcription
@@ -332,6 +484,7 @@ app.post("/api/meetings/:id/transcription/chunks", (req, res) => {
   }
 
   const chunk = addTranscriptChunk(meeting.transcription, { text, speaker, confidence, source });
+  bump("transcriptChunks");
   let autoNote = null;
   if (String(process.env.AUTO_NOTE_FROM_TRANSCRIPT || "true") === "true" && shouldCaptureAsNote(chunk)) {
     autoNote = {
@@ -342,7 +495,10 @@ app.post("/api/meetings/:id/transcription/chunks", (req, res) => {
       timestamp: chunk.timestamp
     };
     meeting.notes.push(autoNote);
+    bump("notesCreated");
   }
+  recordAudit("transcription.chunk", req, meeting.id, { speaker: chunk.speaker, autoNoteCaptured: Boolean(autoNote) });
+  persistState();
 
   return res.status(201).json({ id: meeting.id, chunk, autoNoteCaptured: Boolean(autoNote), autoNote });
 });
@@ -361,6 +517,10 @@ app.post("/api/meetings/:id/transcription/stop", (req, res) => {
     clearInterval(transcriptionTimers.get(meeting.id));
     transcriptionTimers.delete(meeting.id);
   }
+
+  recordAudit("transcription.stop", req, meeting.id);
+  persistState();
+
   return res.json({
     id: meeting.id,
     transcription: formatMeetingResponse(meeting).transcription
@@ -395,6 +555,7 @@ app.post("/api/meetings/:id/transcription/simulate", (req, res) => {
     cursor += 1;
 
     const chunk = addTranscriptChunk(meeting.transcription, { text: nextText, source: "simulator" });
+    bump("transcriptChunks");
     if (String(process.env.AUTO_NOTE_FROM_TRANSCRIPT || "true") === "true" && shouldCaptureAsNote(chunk)) {
       meeting.notes.push({
         id: uuidv4(),
@@ -403,15 +564,21 @@ app.post("/api/meetings/:id/transcription/simulate", (req, res) => {
         source: "transcription_auto",
         timestamp: chunk.timestamp
       });
+      bump("notesCreated");
     }
 
     if (cursor >= chunks.length) {
       clearInterval(timer);
       transcriptionTimers.delete(meeting.id);
     }
+
+    persistState();
   }, stepMs);
 
   transcriptionTimers.set(meeting.id, timer);
+  recordAudit("transcription.simulate", req, meeting.id, { preset: preset || "daily-standup" });
+  persistState();
+
   return res.status(202).json({
     id: meeting.id,
     started: true,
@@ -495,7 +662,11 @@ app.post("/api/hooks/meeting-context", (req, res) => {
       speaker: "BrowserHook",
       timestamp: new Date().toISOString()
     });
+    bump("notesCreated");
   }
+
+  recordAudit("hook.meeting_context", req, meeting.id, { participantsIngested: participants.length });
+  persistState();
 
   return res.json({
     id: meeting.id,
@@ -525,6 +696,10 @@ app.post("/api/meetings/:id/end", (req, res) => {
   meeting.insights = extractInsights(meeting.notes);
   meeting.mom = generateMom(meeting);
 
+  bump("meetingEnded");
+  recordAudit("meeting.end", req, meeting.id, { notes: meeting.notes.length });
+  persistState();
+
   return res.json({
     id: meeting.id,
     endedAt: meeting.endedAt,
@@ -545,13 +720,14 @@ app.post("/api/meetings/:id/insights", (req, res) => {
     meeting.mom = generateMom(meeting);
   }
 
+  persistState();
   return res.json({
     id: meeting.id,
     insights: meeting.insights
   });
 });
 
-app.post("/api/meetings/:id/send-mom", async (req, res) => {
+app.post("/api/meetings/:id/send-mom", (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
@@ -561,36 +737,50 @@ app.post("/api/meetings/:id/send-mom", async (req, res) => {
     return res.status(400).json({ message: "End the meeting first to generate MoM" });
   }
 
-  const { fromEmail } = req.body;
+  const { fromEmail } = req.body || {};
   if (!fromEmail) {
     return res.status(400).json({ message: "fromEmail is required" });
   }
 
-  const transporter = buildTransporter();
+  const job = createEmailJob({
+    meetingId: meeting.id,
+    fromEmail,
+    to: meeting.attendees,
+    subject: `Minutes of Meeting: ${meeting.title}`,
+    text: meeting.mom,
+    maxRetries: Number(process.env.EMAIL_JOB_MAX_RETRIES || 3)
+  });
 
-  if (!transporter) {
-    return res.status(200).json({
-      message: "SMTP not configured. MoM generated and ready; email sending skipped.",
-      preview: {
-        from: fromEmail,
-        to: meeting.attendees,
-        subject: `MoM: ${meeting.title}`
-      }
-    });
+  store.jobs.push(job);
+  bump("momsQueued");
+  recordAudit("mom.email.queued", req, meeting.id, { jobId: job.id, recipients: meeting.attendees.length });
+  persistState();
+
+  return res.status(202).json({ message: "MoM queued for sending", jobId: job.id });
+});
+
+app.get("/api/jobs", requireAdmin, (req, res) => {
+  const recent = store.jobs.slice(-100).reverse();
+  res.json({ jobs: recent });
+});
+
+app.get("/api/jobs/:id", requireAdmin, (req, res) => {
+  const job = store.jobs.find((j) => j.id === req.params.id);
+  if (!job) {
+    return res.status(404).json({ message: "Job not found" });
   }
 
-  try {
-    const info = await transporter.sendMail({
-      from: fromEmail,
-      to: meeting.attendees.join(","),
-      subject: `Minutes of Meeting: ${meeting.title}`,
-      text: meeting.mom
-    });
+  return res.json({ job });
+});
 
-    return res.json({ message: "MoM sent", messageId: info.messageId });
-  } catch (err) {
-    return res.status(500).json({ message: "Failed to send email", error: err.message });
-  }
+app.get("/api/admin/analytics", requireAdmin, (req, res) => {
+  res.json({ analytics: store.analytics, meetingCount: meetings.size, queuedJobs: store.jobs.filter((j) => j.status === "queued").length });
+});
+
+app.get("/api/admin/audit", requireAdmin, (req, res) => {
+  const limit = Math.min(500, Number(req.query.limit || 100));
+  const logs = store.auditLogs.slice(-limit).reverse();
+  res.json({ logs });
 });
 
 app.get("/api/meetings/:id", (req, res) => {
@@ -602,6 +792,80 @@ app.get("/api/meetings/:id", (req, res) => {
   return res.json(formatMeetingResponse(meeting));
 });
 
+function bootstrapAdminUser() {
+  if (store.users.length > 0) {
+    return;
+  }
+
+  const adminEmail = String(process.env.ADMIN_EMAIL || "admin@mom.local").toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || "admin12345";
+  const user = createUser(adminEmail, adminPassword, "admin");
+  store.users.push(user);
+  recordAudit("auth.bootstrap_admin", null, null, { email: adminEmail });
+}
+
+let queueWorkerBusy = false;
+
+async function processEmailJob(job) {
+  const transporter = buildTransporter();
+  if (!transporter) {
+    markJobSuccess(job);
+    return { previewOnly: true };
+  }
+
+  const info = await transporter.sendMail({
+    from: job.payload.fromEmail,
+    to: job.payload.to.join(","),
+    subject: job.payload.subject,
+    text: job.payload.text
+  });
+
+  markJobSuccess(job);
+  return { previewOnly: false, messageId: info.messageId };
+}
+
+async function runQueueWorkerOnce() {
+  if (queueWorkerBusy) {
+    return;
+  }
+
+  const nextJob = getNextRunnableJob(store.jobs);
+  if (!nextJob) {
+    return;
+  }
+
+  queueWorkerBusy = true;
+  markJobProcessing(nextJob);
+  persistState();
+
+  try {
+    const result = await processEmailJob(nextJob);
+    bump("momsSent");
+    recordAudit("job.succeeded", null, nextJob.payload.meetingId, { jobId: nextJob.id, ...result });
+  } catch (err) {
+    if (nextJob.attempts >= nextJob.maxRetries) {
+      markJobFailed(nextJob, err.message);
+      recordAudit("job.failed", null, nextJob.payload.meetingId, { jobId: nextJob.id, error: err.message });
+    } else {
+      markJobRetry(nextJob, err.message);
+      recordAudit("job.retry", null, nextJob.payload.meetingId, {
+        jobId: nextJob.id,
+        error: err.message,
+        attempts: nextJob.attempts
+      });
+    }
+  } finally {
+    queueWorkerBusy = false;
+    persistState();
+  }
+}
+
+loadState();
+bootstrapAdminUser();
+persistState();
+setInterval(runQueueWorkerOnce, Number(process.env.JOB_WORKER_INTERVAL_MS || 2000));
+
 app.listen(port, () => {
   console.log(`MOM app running at http://localhost:${port}`);
+  console.log(`Auth required: ${authRequired}`);
 });
