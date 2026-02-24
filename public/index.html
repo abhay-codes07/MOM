@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MOM - Phase 1</title>
+    <title>MOM - Phase 2</title>
     <style>
       :root {
         --bg: #f4f1ea;
@@ -55,7 +55,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>MOM - Phase 1</h1>
+      <h1>MOM - Phase 2</h1>
       <div class="card">
         <h3>1) Start Meeting</h3>
         <input id="title" placeholder="Meeting title" />
@@ -71,12 +71,17 @@
       </div>
 
       <div class="card">
-        <h3>3) End Meeting + Generate MoM</h3>
+        <h3>3) Generate Insights</h3>
+        <button id="insightsBtn">Generate Insights</button>
+      </div>
+
+      <div class="card">
+        <h3>4) End Meeting + Generate MoM</h3>
         <button id="endBtn">End Meeting</button>
       </div>
 
       <div class="card">
-        <h3>4) Send MoM</h3>
+        <h3>5) Send MoM</h3>
         <input id="fromEmail" placeholder="Your sender email" />
         <button id="sendBtn">Send MoM</button>
       </div>
@@ -138,6 +143,16 @@
           const data = await callApi(`/api/meetings/${meetingId}/end`, "POST");
           lastMom = data.mom;
           setStatus(lastMom);
+        } catch (e) {
+          setStatus(e.message);
+        }
+      };
+
+      document.getElementById("insightsBtn").onclick = async () => {
+        try {
+          if (!meetingId) throw new Error("Start a meeting first");
+          const data = await callApi(`/api/meetings/${meetingId}/insights`, "POST");
+          setStatus({ insights: data.insights });
         } catch (e) {
           setStatus(e.message);
         }
