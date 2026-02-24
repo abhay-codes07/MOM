@@ -91,3 +91,7 @@ npm run dev
 3. Push transcript chunks manually or run simulation preset.
 4. Auto note capture runs for relevant chunks (`AUTO_NOTE_FROM_TRANSCRIPT=true`).
 5. View/export transcript, then end meeting and generate MoM.
+
+Quick terminal demo:
+
+- `powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1`
