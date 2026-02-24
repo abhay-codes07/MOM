@@ -1,36 +1,35 @@
 ﻿# MOM (Minutes of Meeting)
 
-Phase 5 MVP: adds authentication, persistent storage, retryable email job queue, analytics counters, and audit logs on top of Phases 1-4.
+MOM is a full-stack meeting assistant that captures notes, generates MoM, analyzes insights, tracks attendance, supports live transcription, and sends MoM through a retryable email queue.
 
-## 5-Phase Delivery Plan
+## Current Status
 
-1. Phase 1 - Baseline MVP (implemented)
-   - Start/end meeting session
-   - Capture live notes manually
-   - Generate basic MoM text
-   - Send MoM via SMTP (or preview mode when SMTP is not set)
+| Phase | Status | Core Outcome |
+| --- | --- | --- |
+| Phase 1 | Implemented | Meeting start/end, note capture, MoM generation, email send |
+| Phase 2 | Implemented | Insight extraction (summary, decisions, actions, speakers) |
+| Phase 3 | Implemented | Meet/Zoom/Teams integration flow + attendance mapping + browser hook |
+| Phase 4 | Implemented | Live transcription lifecycle + simulation + transcript export |
+| Phase 5 | Implemented | Auth, persistence, queue retries, audit logs, analytics, admin APIs |
 
-2. Phase 2 - AI Note Intelligence (implemented)
-   - Auto summarize notes into agenda, decisions, action items
-   - Speaker-aware note enrichment
-   - Better MoM formatting templates
+## Important Feature
 
-3. Phase 3 - Meeting Platform Integrations (implemented)
-   - Google Meet / Zoom / Teams calendar-linked session start
-   - Participant auto-discovery and attendance mapping
-   - Browser extension hooks for meeting context
+Every generated MoM now starts with an **Overall Meeting Mood** line.  
+This mood summary appears at the top of the email body that attendees receive.
 
-4. Phase 4 - Live Transcription and Auto Notes (implemented)
-   - Real-time speech-to-text pipeline
-   - Voice activity/speaker diarization
-   - Automatic note capture while meeting is active
+## Architecture
 
-5. Phase 5 - Production Hardening (implemented)
-   - Authentication and user accounts
-   - Persistent database and job queue
-   - Retryable email delivery, analytics, audit logs, cloud deployment
+- `src/server.js`: main API server and orchestration
+- `src/auth.js`: password hashing and token auth
+- `src/persistence.js`: JSON-backed persistence (`data/mom-db.json`)
+- `src/queue.js`: email job queue + retry/backoff
+- `src/audit.js`: audit event model and retention
+- `src/transcription.js`: transcription session/chunk utilities
+- `src/platform.js`: meeting platform integration helpers
+- `public/index.html`: browser UI
+- `browser-extension/`: extension sample for meeting context hooks
 
-## Run locally
+## Quick Start
 
 1. Install dependencies:
 
@@ -38,82 +37,81 @@ Phase 5 MVP: adds authentication, persistent storage, retryable email job queue,
 npm install
 ```
 
-2. Copy env template:
+2. Create env file:
 
 ```bash
 copy .env.example .env
 ```
 
-3. (Optional) Fill SMTP values in `.env` for real email sending.
-
-4. Start app:
+3. Start the app:
 
 ```bash
 npm run dev
 ```
 
-5. Open:
+4. Open:
 
 `http://localhost:4000`
 
-## API endpoints
+## Default Admin Login
+
+Use these only for local development (change in production):
+
+- Email: `admin@mom.local`
+- Password: `admin12345`
+
+## API Overview
+
+### Health and Auth
 
 - `GET /api/health`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
+
+### Integrations
+
 - `GET /api/integrations/platforms`
 - `GET /api/integrations/:platform/events?ownerEmail=...`
 - `POST /api/integrations/start-from-event`
+
+### Meetings
+
 - `POST /api/meetings/start`
 - `POST /api/meetings/:id/notes`
 - `POST /api/meetings/:id/presence`
 - `GET /api/meetings/:id/attendance`
-- `POST /api/hooks/meeting-context` (uses `x-hook-key` when `HOOK_API_KEY` is set)
+- `POST /api/meetings/:id/insights`
+- `POST /api/meetings/:id/end`
+- `POST /api/meetings/:id/send-mom`
+- `GET /api/meetings/:id`
+
+### Transcription
+
 - `POST /api/meetings/:id/transcription/start`
 - `POST /api/meetings/:id/transcription/chunks`
 - `POST /api/meetings/:id/transcription/simulate`
 - `POST /api/meetings/:id/transcription/stop`
 - `GET /api/meetings/:id/transcription`
 - `GET /api/meetings/:id/transcription/export?format=txt|json`
-- `POST /api/meetings/:id/insights`
-- `POST /api/meetings/:id/end`
-- `POST /api/meetings/:id/send-mom`
-- `GET /api/jobs` (admin)
-- `GET /api/jobs/:id` (admin)
-- `GET /api/admin/analytics` (admin)
-- `GET /api/admin/audit?limit=...` (admin)
-- `GET /api/admin/users` (admin)
-- `POST /api/admin/users` (admin)
-- `GET /api/meetings/:id`
 
-## Browser extension sample (Phase 3)
+### Admin
 
-- Folder: `browser-extension/`
-- Load it as an unpacked extension in Chromium-based browsers.
-- Use the popup to send `participants` and optional `note` into:
-  - `POST /api/hooks/meeting-context`
+- `GET /api/jobs`
+- `GET /api/jobs/:id`
+- `GET /api/admin/analytics`
+- `GET /api/admin/audit?limit=...`
+- `GET /api/admin/users`
+- `POST /api/admin/users`
 
-## Phase 4 flow
+## Demo Scripts
 
-1. Start meeting (manual or calendar-linked).
-2. Start transcription.
-3. Push transcript chunks manually or run simulation preset.
-4. Auto note capture runs for relevant chunks (`AUTO_NOTE_FROM_TRANSCRIPT=true`).
-5. View/export transcript, then end meeting and generate MoM.
+- Phase 4 flow: `powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1`
+- Phase 5 flow: `powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1`
 
-Quick terminal demo:
+## Production Notes
 
-- `powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1`
-- `powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1`
-
-## Phase 5 flow
-
-1. Login with bootstrap admin credentials from `.env` (or your configured admin user).
-2. Use the token for all API calls (`Authorization: Bearer <token>`) when `AUTH_REQUIRED=true`.
-3. End meeting to generate MoM.
-4. Queue email via `POST /api/meetings/:id/send-mom`.
-5. Track delivery and retries via `GET /api/jobs` and view system telemetry via admin analytics/audit endpoints.
-
-Operational notes:
-
-- See `docs/PHASE5_RUNBOOK.md`.
+- Set strong values for `AUTH_SECRET` and `ADMIN_PASSWORD`
+- Keep `AUTH_REQUIRED=true`
+- Configure SMTP values for real email delivery
+- Persist `DATA_DIR` on durable storage
+- See [docs/PHASE5_RUNBOOK.md](docs/PHASE5_RUNBOOK.md)

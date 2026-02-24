@@ -188,6 +188,71 @@ function extractInsights(notes) {
   };
 }
 
+function inferMeetingMood(notes) {
+  const positiveTerms = [
+    "great", "good", "thanks", "approved", "resolved", "done", "clear", "aligned", "progress", "win", "happy"
+  ];
+  const negativeTerms = [
+    "blocked", "delay", "risk", "issue", "problem", "conflict", "urgent", "escalate", "fail", "stuck", "concern"
+  ];
+  const neutralTerms = [
+    "agenda", "update", "review", "discuss", "note", "sync", "plan", "timeline", "status"
+  ];
+
+  let positiveScore = 0;
+  let negativeScore = 0;
+  let neutralScore = 0;
+
+  for (const note of notes) {
+    const text = normalizeSentence(note.text || "").toLowerCase();
+    if (!text) {
+      continue;
+    }
+
+    for (const term of positiveTerms) {
+      if (text.includes(term)) {
+        positiveScore += 1;
+      }
+    }
+    for (const term of negativeTerms) {
+      if (text.includes(term)) {
+        negativeScore += 1;
+      }
+    }
+    for (const term of neutralTerms) {
+      if (text.includes(term)) {
+        neutralScore += 1;
+      }
+    }
+  }
+
+  const totalSignals = positiveScore + negativeScore + neutralScore;
+  if (totalSignals === 0) {
+    return {
+      label: "Neutral",
+      confidence: 0.5,
+      rationale: "Not enough sentiment cues in notes."
+    };
+  }
+
+  let label = "Neutral";
+  let dominant = neutralScore;
+  if (positiveScore > dominant) {
+    label = "Positive";
+    dominant = positiveScore;
+  }
+  if (negativeScore > dominant) {
+    label = "Concerned";
+    dominant = negativeScore;
+  }
+
+  return {
+    label,
+    confidence: Number((dominant / totalSignals).toFixed(2)),
+    rationale: `Signals -> positive:${positiveScore}, neutral:${neutralScore}, negative:${negativeScore}`
+  };
+}
+
 function formatMeetingResponse(meeting) {
   return {
     ...serializeMeeting(meeting),
@@ -207,6 +272,7 @@ function formatMeetingResponse(meeting) {
 
 function generateMom(meeting) {
   const insights = meeting.insights || extractInsights(meeting.notes);
+  const mood = inferMeetingMood(meeting.notes);
   const attendance = getAttendanceSummary(meeting);
   const noteLines = meeting.notes
     .map((n, i) => `${i + 1}. [${n.timestamp}] ${n.speaker || "Participant"}: ${n.text}`)
@@ -234,6 +300,9 @@ function generateMom(meeting) {
     : "- No attendance events captured.";
 
   return `Minutes of Meeting
+
+Overall Meeting Mood: ${mood.label} (confidence ${mood.confidence})
+Mood Rationale: ${mood.rationale}
 
 Title: ${meeting.title}
 Meeting ID: ${meeting.id}
