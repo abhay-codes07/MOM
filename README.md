@@ -82,6 +82,8 @@ npm run dev
 - `GET /api/jobs/:id` (admin)
 - `GET /api/admin/analytics` (admin)
 - `GET /api/admin/audit?limit=...` (admin)
+- `GET /api/admin/users` (admin)
+- `POST /api/admin/users` (admin)
 - `GET /api/meetings/:id`
 
 ## Browser extension sample (Phase 3)
