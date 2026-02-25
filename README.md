@@ -58,6 +58,8 @@ Important:
 - `src/transcription.js`: transcription session/chunk utilities
 - `src/platform.js`: meeting platform integration helpers
 - `public/index.html`: browser UI
+- `public/styles.css`: luxury visual system (glass cards, sticky blur nav, motion)
+- `public/app.js`: frontend logic + API orchestration
 - `browser-extension/`: extension sample for meeting context hooks
 
 ## Quick Start
@@ -83,6 +85,12 @@ npm run dev
 4. Open:
 
 `http://localhost:4000`
+
+### Frontend Navigation
+
+- Top nav uses anchor links to sections (`Home`, `Features`, `Pricing`, `Control`, etc.).
+- Main functional area is `Control Center`.
+- Advanced operations (calendar start, transcription, admin calls) are included inside Control Center.
 
 ## Default Admin Login
 
