@@ -23,7 +23,8 @@
   function setMeetingState(active) {
     const ids = [
       "noteBtn", "insightsBtn", "endBtn", "presenceBtn", "attendanceBtn", "txStartBtn", "txChunkBtn", "txSimBtn",
-      "txStopBtn", "txStatusBtn", "txExportBtn", "sendBtn", "shareCreateBtn", "shareViewBtn"
+      "txStopBtn", "txStatusBtn", "txExportBtn", "sendBtn", "shareCreateBtn", "shareViewBtn",
+      "intelligenceBtn", "nextAgendaBtn", "momVersionsBtn", "momCompareLatestBtn", "scheduleRemindersBtn"
     ];
     for (const id of ids) {
       const el = document.getElementById(id);
@@ -294,6 +295,64 @@
       setStatus(data);
     } catch (e) {
       setStatus(`Jobs failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("intelligenceBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const data = await callApi(`/api/meetings/${meetingId}/intelligence`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`Intelligence failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("nextAgendaBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const data = await callApi(`/api/meetings/${meetingId}/agenda-next`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`Next agenda failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("momVersionsBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const data = await callApi(`/api/meetings/${meetingId}/mom-versions`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`MoM versions failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("momCompareLatestBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const versionsData = await callApi(`/api/meetings/${meetingId}/mom-versions`, "GET");
+      const versions = versionsData.versions || [];
+      if (versions.length < 2) {
+        throw new Error("Need at least 2 MoM versions. Regenerate MoM via insights refresh after end.");
+      }
+      const oldest = versions[versions.length - 1];
+      const data = await callApi(`/api/meetings/${meetingId}/mom-versions/${oldest.id}/compare?to=latest`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`MoM compare failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("scheduleRemindersBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const fromEmail = document.getElementById("reminderFromEmail").value.trim();
+      const daysAhead = Number(document.getElementById("reminderDaysAhead").value || 1);
+      const data = await callApi(`/api/meetings/${meetingId}/schedule-reminders`, "POST", { fromEmail, daysAhead });
+      setStatus(data);
+    } catch (e) {
+      setStatus(`Reminder scheduling failed: ${e.message}`);
     }
   });
 
