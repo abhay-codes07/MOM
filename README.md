@@ -20,6 +20,14 @@ This mood summary appears at the top of the email body that attendees receive.
 Another new feature: **Secure Shareable MoM Link**  
 You can generate a read-only share link for each meeting MoM and open it in browser.
 
+New differentiator pack:
+
+- **Meeting Intelligence Score** (engagement, actionability, decisiveness, coverage).
+- **Top Keyword Signal Map** for conversational themes.
+- **Next Meeting Agenda Auto-Synthesis** from unresolved actions and decisions.
+- **MoM Version History + Compare** to track how minutes evolve.
+- **Action Reminder Scheduler** that queues owner follow-up reminder emails.
+
 ## Why It Was Only Capturing Typed Notes
 
 Before live Meet capture is enabled, MOM records only:
@@ -125,6 +133,11 @@ Use these only for local development (change in production):
 - `POST /api/meetings/:id/share-mom`
 - `GET /api/meetings/:id/share-mom`
 - `GET /api/meetings/:id`
+- `GET /api/meetings/:id/intelligence`
+- `GET /api/meetings/:id/agenda-next`
+- `GET /api/meetings/:id/mom-versions`
+- `GET /api/meetings/:id/mom-versions/:versionId/compare?to=latest|<versionId>`
+- `POST /api/meetings/:id/schedule-reminders`
 
 ### Public Share
 
