@@ -173,3 +173,4 @@ Use these only for local development (change in production):
 - Configure SMTP values for real email delivery
 - Persist `DATA_DIR` on durable storage
 - See [docs/PHASE5_RUNBOOK.md](docs/PHASE5_RUNBOOK.md)
+- Competitive workflows: [docs/COMPETITIVE_FEATURES.md](docs/COMPETITIVE_FEATURES.md)
