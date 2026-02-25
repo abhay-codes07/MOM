@@ -3,453 +3,265 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MOM</title>
-    <style>
-      :root {
-        --bg: #f4f1ea;
-        --panel: #fffaf2;
-        --ink: #1f1f1f;
-        --brand: #0d6b54;
-        --border: #d9d2c3;
-        --muted: #5e6a66;
-      }
-      body {
-        margin: 0;
-        font-family: "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top left, #fff8ec, var(--bg));
-        color: var(--ink);
-      }
-      .wrap {
-        max-width: 960px;
-        margin: 24px auto;
-        padding: 16px;
-      }
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 12px;
-      }
-      h1 {
-        margin-top: 0;
-      }
-      h3 {
-        margin: 8px 0 10px;
-      }
-      p.small {
-        color: var(--muted);
-        margin-top: 0;
-      }
-      input, textarea, button {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 10px;
-        margin: 6px 0;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        font-size: 14px;
-      }
-      button {
-        background: var(--brand);
-        color: white;
-        border: none;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-      pre {
-        white-space: pre-wrap;
-        background: #fff;
-        border: 1px solid var(--border);
-        padding: 10px;
-        border-radius: 8px;
-      }
-      .row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-      details {
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: #fff;
-        padding: 10px;
-      }
-      summary {
-        cursor: pointer;
-        font-weight: 600;
-      }
-    </style>
+    <title>MOM - Luxury Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
   </head>
   <body>
-    <div class="wrap">
-      <h1>MOM</h1>
-      <p class="small">Simple flow: Login -> Start Meeting -> Add Notes -> End -> Send MoM</p>
-
-      <div class="card">
-        <h3>1) Login</h3>
-        <input id="loginEmail" placeholder="Email" value="admin@mom.local" />
-        <input id="loginPassword" type="password" placeholder="Password" value="admin12345" />
-        <button type="button" id="loginBtn">Login</button>
-      </div>
-
-      <div class="card">
-        <h3>2) Start Meeting</h3>
-        <input id="title" placeholder="Meeting title" />
-        <input id="attendees" placeholder="Attendee emails (comma separated)" />
-        <input id="meetingLink" placeholder="Meeting link (optional)" />
-        <button type="button" id="startBtn" disabled>Start Meeting</button>
-      </div>
-
-      <div class="card">
-        <h3>3) Add Notes</h3>
-        <input id="speaker" placeholder="Speaker" />
-        <textarea id="note" rows="3" placeholder="Type note"></textarea>
-        <button type="button" id="noteBtn" disabled>Add Note</button>
-      </div>
-
-      <div class="card">
-        <h3>4) End Meeting & Generate MoM</h3>
-        <button type="button" id="endBtn" disabled>End Meeting</button>
-      </div>
-
-      <div class="card">
-        <h3>5) Send & Share</h3>
-        <input id="fromEmail" placeholder="Your sender email" />
-        <div class="row">
-          <button type="button" id="sendBtn" disabled>Send MoM</button>
-          <button type="button" id="shareCreateBtn" disabled>Create Share Link</button>
+    <header class="site-nav">
+      <div class="nav-inner">
+        <a href="#home" class="brand">
+          <span class="brand-badge"></span>
+          MOM Studio
+        </a>
+        <nav class="nav-links">
+          <a href="#home">Home</a>
+          <a href="#featured">Featured</a>
+          <a href="#how">How It Works</a>
+          <a href="#features">Features</a>
+          <a href="#mission">Mission</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#control">Control</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+        <div class="nav-actions">
+          <a class="btn" href="#control">Open Workspace</a>
+          <a class="btn btn-brand" href="#control">Get Started</a>
+          <button id="menuBtn" class="menu-btn" type="button"><i class="ph ph-list"></i></button>
         </div>
-        <button type="button" id="shareViewBtn" disabled>Get Share Link</button>
       </div>
+    </header>
 
-      <div class="card">
-        <details>
-          <summary>Advanced Tools (optional)</summary>
-          <p class="small">Calendar start, attendance, live transcription, admin metrics.</p>
+    <aside id="mobileTray" class="mobile-tray">
+      <button id="closeTrayBtn" class="btn" type="button">Close</button>
+      <a href="#home">Home</a>
+      <a href="#featured">Featured</a>
+      <a href="#how">How It Works</a>
+      <a href="#features">Features</a>
+      <a href="#mission">Mission</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#control">Control</a>
+      <a href="#faq">FAQ</a>
+    </aside>
 
-          <h3>Calendar Start</h3>
-          <input id="ownerEmail" placeholder="Calendar owner email" />
-          <input id="platform" placeholder="google_meet | zoom | microsoft_teams" value="google_meet" />
-          <button type="button" id="loadEventsBtn" disabled>Load Events</button>
-          <textarea id="eventList" rows="5" placeholder="Events"></textarea>
-          <input id="eventId" placeholder="Paste Event ID here" />
-          <button type="button" id="startFromEventBtn" disabled>Start from Event</button>
+    <main>
+      <section id="home" class="section hero glass-card reveal">
+        <h1>Your Premium Minutes of Meeting Studio</h1>
+        <p>
+          Capture meetings, auto-build MoM, infer mood, run live Meet transcript capture, and deliver polished minutes to every attendee with zero chaos.
+        </p>
+        <div class="actions" style="justify-content:center">
+          <a class="btn btn-brand" href="#control">Get Started</a>
+          <a class="btn" href="#how">See How It Works</a>
+        </div>
+        <div class="hero-visual">
+          <div class="visual-frame">
+            Product UI Showcase Area (Spline/3D panel placeholder)
+          </div>
+        </div>
+      </section>
 
-          <h3>Attendance</h3>
-          <input id="presenceName" placeholder="Name" />
-          <input id="presenceEmail" placeholder="Email" />
-          <input id="presenceAction" placeholder="join or leave" value="join" />
-          <div class="row">
-            <button type="button" id="presenceBtn" disabled>Add Presence</button>
-            <button type="button" id="attendanceBtn" disabled>View Attendance</button>
+      <section id="featured" class="section reveal" data-delay="1">
+        <div class="glass-card tile">
+          <h2 class="section-title">Featured In</h2>
+          <p class="section-sub">Trusted by teams running high-stakes meetings.</p>
+          <div class="grid-4">
+            <div class="tile glass-card"><strong>TechPulse</strong><p>AI Productivity Leaderboard</p></div>
+            <div class="tile glass-card"><strong>StartupDaily</strong><p>Workflow Automation Picks</p></div>
+            <div class="tile glass-card"><strong>SaaS Weekly</strong><p>Ops Excellence Stack</p></div>
+            <div class="tile glass-card"><strong>Builder Times</strong><p>Editor’s Choice</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" data-delay="2">
+        <div class="glass-card tile">
+          <h2 class="section-title">Results From Teams</h2>
+          <div class="testimonial-track">
+            <div class="testimonial-row">
+              <article class="t-card glass-card"><h4>Saved 6 hrs/week</h4><p>"MoM quality improved and follow-ups became automatic."</p></article>
+              <article class="t-card glass-card"><h4>2x faster decisions</h4><p>"Action items and owners are now always clear."</p></article>
+              <article class="t-card glass-card"><h4>Audit-ready records</h4><p>"Every change and send event is traceable."</p></article>
+              <article class="t-card glass-card"><h4>95% less manual typing</h4><p>"Live captions feed into our notes flow."</p></article>
+              <article class="t-card glass-card"><h4>Saved 6 hrs/week</h4><p>"MoM quality improved and follow-ups became automatic."</p></article>
+              <article class="t-card glass-card"><h4>2x faster decisions</h4><p>"Action items and owners are now always clear."</p></article>
+              <article class="t-card glass-card"><h4>Audit-ready records</h4><p>"Every change and send event is traceable."</p></article>
+              <article class="t-card glass-card"><h4>95% less manual typing</h4><p>"Live captions feed into our notes flow."</p></article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" class="section reveal" data-delay="1">
+        <div class="glass-card tile">
+          <h2 class="section-title">How It Works</h2>
+          <div class="grid-2">
+            <article class="tile glass-card">
+              <h4>1) Setup Your Assistant</h4>
+              <p>Login, start a meeting, optionally enable Google Meet live capture, and assign attendees.</p>
+            </article>
+            <article class="tile glass-card">
+              <h4>2) Ask Anything / Capture Everything</h4>
+              <p>Add notes manually or ingest live captions. End meeting to generate mood + summary + action items instantly.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section reveal" data-delay="2">
+        <div class="glass-card tile">
+          <h2 class="section-title">Features</h2>
+          <div class="grid-4">
+            <article class="tile glass-card"><h4><i class="ph ph-waveform"></i> Live Capture</h4><p>Google Meet caption ingestion with recording indicator.</p></article>
+            <article class="tile glass-card"><h4><i class="ph ph-smiley"></i> Mood Summary</h4><p>Every MoM starts with overall meeting mood.</p></article>
+            <article class="tile glass-card"><h4><i class="ph ph-paper-plane-right"></i> Queue Delivery</h4><p>Retryable email jobs with audit trail and analytics.</p></article>
+            <article class="tile glass-card"><h4><i class="ph ph-link"></i> Share Links</h4><p>Generate secure read-only MoM share URLs.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="mission" class="section reveal">
+        <div class="glass-card tile">
+          <h2 class="section-title">Mission</h2>
+          <p class="section-sub">Meetings should produce decisions, accountability, and momentum, not confusion. MOM exists to turn live conversation into structured outcomes teams can trust.</p>
+        </div>
+      </section>
+
+      <section id="pricing" class="section reveal" data-delay="1">
+        <div class="glass-card tile">
+          <h2 class="section-title">Pricing</h2>
+          <div class="grid-3">
+            <article class="tile glass-card">
+              <h4>Free</h4>
+              <p>Core meeting notes + MoM + basic share.</p>
+              <p>• Manual notes</p><p>• Basic insights</p><p>• Community support</p>
+            </article>
+            <article class="tile glass-card">
+              <span class="badge"><i class="ph ph-star"></i> Recommended</span>
+              <h4>Pro</h4>
+              <p>Live capture, queue delivery, advanced insights.</p>
+              <p>• Live Meet captions</p><p>• Mood + actions</p><p>• Audit + analytics</p>
+            </article>
+            <article class="tile glass-card">
+              <h4>Enterprise</h4>
+              <p>Full governance and custom integrations.</p>
+              <p>• SSO</p><p>• Policy controls</p><p>• Priority onboarding</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="control" class="section reveal" data-delay="2">
+        <div class="glass-card control-center">
+          <h2 class="section-title">Control Center</h2>
+          <p class="section-sub">Run your full MOM workflow from here.</p>
+
+          <div class="grid-2">
+            <div class="tile glass-card">
+              <h4>Auth</h4>
+              <label>Email</label><input class="field" id="loginEmail" value="admin@mom.local" />
+              <label>Password</label><input class="field" id="loginPassword" type="password" value="admin12345" />
+              <div class="actions"><button class="btn btn-brand" type="button" id="loginBtn">Login</button></div>
+            </div>
+
+            <div class="tile glass-card">
+              <h4>Start Meeting</h4>
+              <label>Title</label><input class="field" id="title" placeholder="Weekly Product Sync" />
+              <label>Attendees (comma separated)</label><input class="field" id="attendees" placeholder="a@example.com, b@example.com" />
+              <label>Meeting Link (optional)</label><input class="field" id="meetingLink" placeholder="https://meet.google.com/..." />
+              <div class="actions"><button class="btn" type="button" id="startBtn" disabled>Start Meeting</button></div>
+            </div>
           </div>
 
-          <h3>Transcription</h3>
-          <input id="txLanguage" placeholder="Language" value="en-US" />
-          <input id="txProvider" placeholder="Provider" value="mock-realtime" />
-          <button type="button" id="txStartBtn" disabled>Start Transcription</button>
-          <textarea id="txChunk" rows="3" placeholder="Speaker: text"></textarea>
-          <button type="button" id="txChunkBtn" disabled>Ingest Chunk</button>
-          <input id="txPreset" placeholder="daily-standup | planning" value="daily-standup" />
-          <div class="row">
-            <button type="button" id="txSimBtn" disabled>Simulate</button>
-            <button type="button" id="txStopBtn" disabled>Stop</button>
+          <div class="grid-2">
+            <div class="tile glass-card">
+              <h4>Capture Notes</h4>
+              <label>Speaker</label><input class="field" id="speaker" placeholder="Abhay" />
+              <label>Note</label><textarea id="note" placeholder="Action: ..."></textarea>
+              <div class="actions">
+                <button class="btn" type="button" id="noteBtn" disabled>Add Note</button>
+                <button class="btn" type="button" id="insightsBtn" disabled>Generate Insights</button>
+              </div>
+            </div>
+
+            <div class="tile glass-card">
+              <h4>Complete Meeting</h4>
+              <label>From Email</label><input class="field" id="fromEmail" placeholder="you@company.com" />
+              <div class="actions">
+                <button class="btn" type="button" id="endBtn" disabled>End Meeting</button>
+                <button class="btn" type="button" id="sendBtn" disabled>Send MoM</button>
+                <button class="btn" type="button" id="shareCreateBtn" disabled>Create Share Link</button>
+                <button class="btn" type="button" id="shareViewBtn" disabled>Get Share Link</button>
+              </div>
+            </div>
           </div>
-          <div class="row">
-            <button type="button" id="txStatusBtn" disabled>View Transcript</button>
-            <button type="button" id="txExportBtn" disabled>Export JSON</button>
+
+          <div class="tile glass-card">
+            <h4>Live & Advanced Controls</h4>
+            <div class="grid-3">
+              <div>
+                <label>Calendar Owner</label><input class="field" id="ownerEmail" placeholder="owner@example.com" />
+                <label>Platform</label><input class="field" id="platform" value="google_meet" />
+                <label>Event ID</label><input class="field" id="eventId" placeholder="Load events -> pick id" />
+                <div class="actions">
+                  <button class="btn" type="button" id="loadEventsBtn" disabled>Load Events</button>
+                  <button class="btn" type="button" id="startFromEventBtn" disabled>Start from Event</button>
+                </div>
+              </div>
+              <div>
+                <label>Presence Name</label><input class="field" id="presenceName" />
+                <label>Presence Email</label><input class="field" id="presenceEmail" />
+                <label>Action (join/leave)</label><input class="field" id="presenceAction" value="join" />
+                <div class="actions">
+                  <button class="btn" type="button" id="presenceBtn" disabled>Add Presence</button>
+                  <button class="btn" type="button" id="attendanceBtn" disabled>View Attendance</button>
+                </div>
+              </div>
+              <div>
+                <label>Transcription Lang</label><input class="field" id="txLanguage" value="en-US" />
+                <label>Provider</label><input class="field" id="txProvider" value="mock-realtime" />
+                <label>Chunk</label><textarea id="txChunk" placeholder="Speaker: text"></textarea>
+                <div class="actions">
+                  <button class="btn" type="button" id="txStartBtn" disabled>Start Tx</button>
+                  <button class="btn" type="button" id="txChunkBtn" disabled>Ingest</button>
+                  <button class="btn" type="button" id="txSimBtn" disabled>Simulate</button>
+                  <button class="btn" type="button" id="txStatusBtn" disabled>View Tx</button>
+                  <button class="btn" type="button" id="txExportBtn" disabled>Export Tx</button>
+                  <button class="btn" type="button" id="txStopBtn" disabled>Stop Tx</button>
+                </div>
+              </div>
+            </div>
+            <label>Events</label>
+            <textarea id="eventList" placeholder="Calendar events will appear here"></textarea>
+            <div class="actions">
+              <button class="btn" type="button" id="analyticsBtn" disabled>Analytics</button>
+              <button class="btn" type="button" id="auditBtn" disabled>Audit Logs</button>
+              <button class="btn" type="button" id="jobsBtn" disabled>Jobs</button>
+            </div>
           </div>
 
-          <h3>Admin</h3>
-          <div class="row">
-            <button type="button" id="analyticsBtn" disabled>Analytics</button>
-            <button type="button" id="auditBtn" disabled>Audit Logs</button>
-          </div>
-          <button type="button" id="jobsBtn" disabled>Jobs</button>
-        </details>
-      </div>
+          <div class="status-box" id="status">Login first.</div>
+        </div>
+      </section>
 
-      <div class="card">
-        <h3>Status</h3>
-        <pre id="status">Login first.</pre>
-      </div>
-    </div>
+      <section id="faq" class="section reveal" data-delay="3">
+        <div class="glass-card tile">
+          <h2 class="section-title">FAQ</h2>
+          <details class="faq-item glass-card"><summary>Why are notes missing sometimes?</summary><p>Live capture depends on captions visibility and network delivery. Keep captions ON and MOM live hook active.</p></details>
+          <details class="faq-item glass-card"><summary>Can I share MoM publicly?</summary><p>Yes. Generate a share link in Control Center and send the read-only URL.</p></details>
+          <details class="faq-item glass-card"><summary>Why is email queued?</summary><p>Queue + retries improves reliability and provides status visibility in admin jobs.</p></details>
+        </div>
+      </section>
 
-    <script>
-      let meetingId = null;
-      let lastMom = "";
-      let authToken = "";
+      <footer>
+        <strong>MOM Studio</strong><br />
+        High-fidelity Minutes of Meeting automation with live capture, insights, and delivery workflow.
+      </footer>
+    </main>
 
-      const status = document.getElementById("status");
-
-      function setStatus(msg) {
-        status.textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2);
-      }
-
-      function setAuthState(isLoggedIn) {
-        const ids = [
-          "startBtn", "loadEventsBtn", "startFromEventBtn", "analyticsBtn", "auditBtn", "jobsBtn"
-        ];
-        for (const id of ids) {
-          document.getElementById(id).disabled = !isLoggedIn;
-        }
-      }
-
-      function setMeetingState(active) {
-        const ids = [
-          "noteBtn", "endBtn", "presenceBtn", "attendanceBtn", "txStartBtn", "txChunkBtn", "txSimBtn",
-          "txStopBtn", "txStatusBtn", "txExportBtn", "sendBtn", "shareCreateBtn", "shareViewBtn"
-        ];
-        for (const id of ids) {
-          document.getElementById(id).disabled = !active;
-        }
-      }
-
-      async function callApi(path, method, body) {
-        const headers = { "Content-Type": "application/json" };
-        if (authToken) headers.Authorization = `Bearer ${authToken}`;
-
-        const res = await fetch(path, {
-          method,
-          headers,
-          body: body ? JSON.stringify(body) : undefined
-        });
-
-        const contentType = res.headers.get("content-type") || "";
-        const data = contentType.includes("application/json") ? await res.json() : await res.text();
-        if (!res.ok) {
-          const message = typeof data === "object" && data?.message ? data.message : String(data);
-          throw new Error(message || "Request failed");
-        }
-        return data;
-      }
-
-      document.getElementById("loginBtn").onclick = async () => {
-        try {
-          const email = document.getElementById("loginEmail").value.trim();
-          const password = document.getElementById("loginPassword").value.trim();
-          const data = await callApi("/api/auth/login", "POST", { email, password });
-          authToken = data.token;
-          setAuthState(true);
-          setStatus({ message: "Login successful", user: data.user });
-        } catch (e) {
-          setStatus(`Login failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("startBtn").onclick = async () => {
-        try {
-          const title = document.getElementById("title").value.trim();
-          const attendees = document.getElementById("attendees").value.split(",").map(x => x.trim()).filter(Boolean);
-          const meetingLink = document.getElementById("meetingLink").value.trim();
-          const data = await callApi("/api/meetings/start", "POST", { title, attendees, meetingLink });
-          meetingId = data.id;
-          lastMom = "";
-          setMeetingState(true);
-          setStatus({ message: "Meeting started", meetingId, title: data.title, attendees: data.attendees });
-        } catch (e) {
-          setStatus(`Start failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("noteBtn").onclick = async () => {
-        try {
-          if (!meetingId) throw new Error("Start meeting first");
-          const text = document.getElementById("note").value.trim();
-          const speaker = document.getElementById("speaker").value.trim();
-          const data = await callApi(`/api/meetings/${meetingId}/notes`, "POST", { text, speaker });
-          document.getElementById("note").value = "";
-          setStatus({ message: "Note added", note: data });
-        } catch (e) {
-          setStatus(`Note failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("endBtn").onclick = async () => {
-        try {
-          if (!meetingId) throw new Error("Start meeting first");
-          const data = await callApi(`/api/meetings/${meetingId}/end`, "POST");
-          lastMom = data.mom;
-          setStatus(data.mom);
-        } catch (e) {
-          setStatus(`End failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("sendBtn").onclick = async () => {
-        try {
-          if (!meetingId) throw new Error("Start meeting first");
-          if (!lastMom) throw new Error("End meeting first");
-          const fromEmail = document.getElementById("fromEmail").value.trim();
-          const data = await callApi(`/api/meetings/${meetingId}/send-mom`, "POST", { fromEmail });
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Send failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("shareCreateBtn").onclick = async () => {
-        try {
-          if (!meetingId) throw new Error("Start meeting first");
-          const data = await callApi(`/api/meetings/${meetingId}/share-mom`, "POST");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Share create failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("shareViewBtn").onclick = async () => {
-        try {
-          if (!meetingId) throw new Error("Start meeting first");
-          const data = await callApi(`/api/meetings/${meetingId}/share-mom`, "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Share fetch failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("loadEventsBtn").onclick = async () => {
-        try {
-          const ownerEmail = document.getElementById("ownerEmail").value.trim() || "owner@example.com";
-          const platform = document.getElementById("platform").value.trim() || "google_meet";
-          const data = await callApi(`/api/integrations/${platform}/events?ownerEmail=${encodeURIComponent(ownerEmail)}`, "GET");
-          const formatted = data.events.map(e => `${e.eventId} | ${e.title} | ${e.startsAt} | ${e.meetingLink}`).join("\n");
-          document.getElementById("eventList").value = formatted;
-          document.getElementById("eventId").value = data.events[0]?.eventId || "";
-          setStatus({ message: "Events loaded", count: data.events.length, firstEventId: data.events[0]?.eventId || null });
-        } catch (e) {
-          setStatus(`Load events failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("startFromEventBtn").onclick = async () => {
-        try {
-          const ownerEmail = document.getElementById("ownerEmail").value.trim() || "owner@example.com";
-          const platform = document.getElementById("platform").value.trim() || "google_meet";
-          const eventId = document.getElementById("eventId").value.trim();
-          if (!eventId) throw new Error("Load events first, then keep an Event ID");
-          const data = await callApi("/api/integrations/start-from-event", "POST", { ownerEmail, platform, eventId });
-          meetingId = data.meeting.id;
-          lastMom = "";
-          setMeetingState(true);
-          setStatus({ message: "Meeting started from calendar", meetingId, source: data.meeting.source, platform: data.meeting.platform });
-        } catch (e) {
-          setStatus(`Calendar start failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("presenceBtn").onclick = async () => {
-        try {
-          const name = document.getElementById("presenceName").value.trim();
-          const email = document.getElementById("presenceEmail").value.trim();
-          const action = document.getElementById("presenceAction").value.trim() || "join";
-          const data = await callApi(`/api/meetings/${meetingId}/presence`, "POST", { name, email, action, source: "ui_manual" });
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Presence failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("attendanceBtn").onclick = async () => {
-        try {
-          const data = await callApi(`/api/meetings/${meetingId}/attendance`, "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Attendance failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("txStartBtn").onclick = async () => {
-        try {
-          const language = document.getElementById("txLanguage").value.trim();
-          const provider = document.getElementById("txProvider").value.trim();
-          const data = await callApi(`/api/meetings/${meetingId}/transcription/start`, "POST", { language, provider });
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Transcription start failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("txChunkBtn").onclick = async () => {
-        try {
-          const text = document.getElementById("txChunk").value.trim();
-          const data = await callApi(`/api/meetings/${meetingId}/transcription/chunks`, "POST", { text, source: "ui_live" });
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Chunk failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("txSimBtn").onclick = async () => {
-        try {
-          const preset = document.getElementById("txPreset").value.trim() || "daily-standup";
-          const data = await callApi(`/api/meetings/${meetingId}/transcription/simulate`, "POST", { preset, intervalMs: 1000 });
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Simulation failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("txStopBtn").onclick = async () => {
-        try {
-          const data = await callApi(`/api/meetings/${meetingId}/transcription/stop`, "POST");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Stop failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("txStatusBtn").onclick = async () => {
-        try {
-          const data = await callApi(`/api/meetings/${meetingId}/transcription`, "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Transcript view failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("txExportBtn").onclick = async () => {
-        try {
-          const data = await callApi(`/api/meetings/${meetingId}/transcription/export?format=json`, "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Transcript export failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("analyticsBtn").onclick = async () => {
-        try {
-          const data = await callApi("/api/admin/analytics", "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Analytics failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("auditBtn").onclick = async () => {
-        try {
-          const data = await callApi("/api/admin/audit?limit=25", "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Audit failed: ${e.message}`);
-        }
-      };
-
-      document.getElementById("jobsBtn").onclick = async () => {
-        try {
-          const data = await callApi("/api/jobs", "GET");
-          setStatus(data);
-        } catch (e) {
-          setStatus(`Jobs failed: ${e.message}`);
-        }
-      };
-
-      setAuthState(false);
-      setMeetingState(false);
-    </script>
+    <script src="/app.js"></script>
   </body>
 </html>
