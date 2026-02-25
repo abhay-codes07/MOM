@@ -16,6 +16,9 @@ const { getPresetChunks } = require("./transcript-presets");
 const { createUser, verifyPassword, signAuthToken, verifyAuthToken, extractBearerToken } = require("./auth");
 const { readDb, writeDb } = require("./persistence");
 const { createAuditEvent, appendAudit } = require("./audit");
+const { getTopKeywords, computeMeetingScore, buildNextAgenda } = require("./meeting-intelligence");
+const { appendMomVersion, diffMomText } = require("./mom-versioning");
+const { createReminderJobsFromInsights } = require("./reminder-jobs");
 const {
   createEmailJob,
   markJobProcessing,
@@ -48,6 +51,8 @@ const store = {
     transcriptChunks: 0,
     momsQueued: 0,
     momsSent: 0,
+    remindersQueued: 0,
+    remindersSent: 0,
     authLogins: 0
   }
 };
@@ -128,6 +133,7 @@ function createMeeting({ title, attendees, meetingLink = "", platform, source = 
     notes: [],
     insights: null,
     mom: null,
+    momVersions: [],
     momShare: null,
     presenceEvents: [],
     attendanceMap: new Map(),
@@ -254,10 +260,26 @@ function inferMeetingMood(notes) {
   };
 }
 
+function buildMeetingIntelligence(meeting) {
+  const insights = meeting.insights || extractInsights(meeting.notes);
+  const mood = inferMeetingMood(meeting.notes);
+  const topKeywords = getTopKeywords(meeting.notes, 15);
+  const score = computeMeetingScore(meeting, insights, mood);
+  const nextAgenda = buildNextAgenda(meeting, insights, 6);
+
+  return {
+    mood,
+    score,
+    topKeywords,
+    nextAgenda
+  };
+}
+
 function formatMeetingResponse(meeting) {
   return {
     ...serializeMeeting(meeting),
     momShare: meeting.momShare,
+    momVersions: meeting.momVersions || [],
     transcription: meeting.transcription
       ? {
         id: meeting.transcription.id,
@@ -844,6 +866,7 @@ app.post("/api/meetings/:id/end", (req, res) => {
   }
   meeting.insights = extractInsights(meeting.notes);
   meeting.mom = generateMom(meeting);
+  appendMomVersion(meeting, meeting.mom, "meeting_end");
 
   bump("meetingEnded");
   recordAudit("meeting.end", req, meeting.id, { notes: meeting.notes.length });
@@ -867,12 +890,100 @@ app.post("/api/meetings/:id/insights", (req, res) => {
   meeting.insights = extractInsights(meeting.notes);
   if (!meeting.isActive) {
     meeting.mom = generateMom(meeting);
+    appendMomVersion(meeting, meeting.mom, "insights_refresh");
   }
 
   persistState();
   return res.json({
     id: meeting.id,
     insights: meeting.insights
+  });
+});
+
+app.get("/api/meetings/:id/intelligence", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const intelligence = buildMeetingIntelligence(meeting);
+  return res.json({ id: meeting.id, intelligence });
+});
+
+app.get("/api/meetings/:id/agenda-next", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const intelligence = buildMeetingIntelligence(meeting);
+  return res.json({ id: meeting.id, agenda: intelligence.nextAgenda });
+});
+
+app.get("/api/meetings/:id/mom-versions", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const versions = (meeting.momVersions || []).slice().reverse();
+  return res.json({ id: meeting.id, versions });
+});
+
+app.get("/api/meetings/:id/mom-versions/:versionId/compare", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const versions = meeting.momVersions || [];
+  const base = versions.find((v) => v.id === req.params.versionId);
+  if (!base) {
+    return res.status(404).json({ message: "Base version not found" });
+  }
+
+  const compareId = String(req.query.to || "latest");
+  const target = compareId === "latest" ? versions[versions.length - 1] : versions.find((v) => v.id === compareId);
+  if (!target) {
+    return res.status(404).json({ message: "Target version not found" });
+  }
+
+  return res.json({
+    id: meeting.id,
+    base: { id: base.id, createdAt: base.createdAt, reason: base.reason },
+    target: { id: target.id, createdAt: target.createdAt, reason: target.reason },
+    diff: diffMomText(base.text, target.text)
+  });
+});
+
+app.post("/api/meetings/:id/schedule-reminders", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+  if (!meeting.insights) {
+    meeting.insights = extractInsights(meeting.notes);
+  }
+
+  const { fromEmail, daysAhead } = req.body || {};
+  if (!fromEmail) {
+    return res.status(400).json({ message: "fromEmail is required" });
+  }
+
+  const jobs = createReminderJobsFromInsights(meeting, fromEmail, Number(daysAhead || 1));
+  if (!jobs.length) {
+    return res.status(200).json({ message: "No action items available for reminders", jobsCreated: 0 });
+  }
+
+  store.jobs.push(...jobs);
+  bump("remindersQueued", jobs.length);
+  recordAudit("reminders.queued", req, meeting.id, { jobsCreated: jobs.length });
+  persistState();
+
+  return res.status(201).json({
+    id: meeting.id,
+    jobsCreated: jobs.length,
+    jobIds: jobs.map((j) => j.id)
   });
 });
 
@@ -1066,7 +1177,11 @@ async function runQueueWorkerOnce() {
 
   try {
     const result = await processEmailJob(nextJob);
-    bump("momsSent");
+    if (nextJob.type === "send_mom_email") {
+      bump("momsSent");
+    } else if (nextJob.type === "action_reminder_email") {
+      bump("remindersSent");
+    }
     recordAudit("job.succeeded", null, nextJob.payload.meetingId, { jobId: nextJob.id, ...result });
   } catch (err) {
     if (nextJob.attempts >= nextJob.maxRetries) {
