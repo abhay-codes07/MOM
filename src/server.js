@@ -19,6 +19,7 @@ const { createAuditEvent, appendAudit } = require("./audit");
 const { getTopKeywords, computeMeetingScore, buildNextAgenda } = require("./meeting-intelligence");
 const { appendMomVersion, diffMomText } = require("./mom-versioning");
 const { createReminderJobsFromInsights } = require("./reminder-jobs");
+const { parseActionItemFromText, buildRiskRadar, buildFollowupDrafts } = require("./ai-ops");
 const {
   createEmailJob,
   markJobProcessing,
@@ -175,11 +176,7 @@ function extractInsights(notes) {
     }
 
     if (/^(action|todo)[:\s-]/i.test(text) || /(follow up|will|needs to|should)/i.test(text)) {
-      actionItems.push({
-        owner: speaker,
-        item: text.replace(/^(action|todo)[:\s-]*/i, ""),
-        status: "open"
-      });
+      actionItems.push(parseActionItemFromText(text, speaker));
     }
   }
 
@@ -907,7 +904,7 @@ app.get("/api/meetings/:id/intelligence", (req, res) => {
   }
 
   const intelligence = buildMeetingIntelligence(meeting);
-  return res.json({ id: meeting.id, intelligence });
+  return res.json({ id: meeting.id, intelligence, riskRadar: buildRiskRadar(meeting.notes) });
 });
 
 app.get("/api/meetings/:id/agenda-next", (req, res) => {
@@ -918,6 +915,30 @@ app.get("/api/meetings/:id/agenda-next", (req, res) => {
 
   const intelligence = buildMeetingIntelligence(meeting);
   return res.json({ id: meeting.id, agenda: intelligence.nextAgenda });
+});
+
+app.get("/api/meetings/:id/risk-radar", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const radar = buildRiskRadar(meeting.notes);
+  return res.json({ id: meeting.id, riskRadar: radar });
+});
+
+app.get("/api/meetings/:id/followup-drafts", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  if (!meeting.insights) {
+    meeting.insights = extractInsights(meeting.notes);
+  }
+
+  const drafts = buildFollowupDrafts(meeting, meeting.insights);
+  return res.json({ id: meeting.id, drafts });
 });
 
 app.get("/api/meetings/:id/mom-versions", (req, res) => {
