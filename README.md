@@ -1,176 +1,282 @@
-﻿# MOM (Minutes of Meeting)
+﻿# MOM AI
 
-MOM is a full-stack meeting assistant that captures notes, generates MoM, analyzes insights, tracks attendance, supports live transcription, and sends MoM through a retryable email queue.
+**Real-Time Meeting Intelligence Platform**  
+Capture live conversations, generate actionable Minutes of Meeting, and ship decisions to every attendee with traceable delivery.
 
-## Current Status
+---
 
-| Phase | Status | Core Outcome |
-| --- | --- | --- |
-| Phase 1 | Implemented | Meeting start/end, note capture, MoM generation, email send |
-| Phase 2 | Implemented | Insight extraction (summary, decisions, actions, speakers) |
-| Phase 3 | Implemented | Meet/Zoom/Teams integration flow + attendance mapping + browser hook |
-| Phase 4 | Implemented | Live transcription lifecycle + simulation + transcript export |
-| Phase 5 | Implemented | Auth, persistence, queue retries, audit logs, analytics, admin APIs |
+## Live Demo
 
-## Important Feature
+- Local App: `http://localhost:4000`
+- Public Repo: `https://github.com/abhay-codes07/MOM`
+- Demo video/GIF placeholders:
+  - `./docs/demo-live-capture.gif`
+  - `./docs/demo-mom-generation.gif`
 
-Every generated MoM now starts with an **Overall Meeting Mood** line.  
-This mood summary appears at the top of the email body that attendees receive.
+---
 
-Another new feature: **Secure Shareable MoM Link**  
-You can generate a read-only share link for each meeting MoM and open it in browser.
+## What is MOM AI?
 
-New differentiator pack:
+MOM AI is a real-time meeting operations system that combines manual notes, Google Meet caption ingestion, transcription workflows, intelligence scoring, and asynchronous MoM delivery.
 
-- **Meeting Intelligence Score** (engagement, actionability, decisiveness, coverage).
-- **Top Keyword Signal Map** for conversational themes.
-- **Next Meeting Agenda Auto-Synthesis** from unresolved actions and decisions.
-- **MoM Version History + Compare** to track how minutes evolve.
-- **Action Reminder Scheduler** that queues owner follow-up reminder emails.
+It is built to convert meeting noise into structured outcomes:
+- mood
+- decisions
+- action items
+- reminders
+- delivery status
+- audit trail
 
-## Why It Was Only Capturing Typed Notes
+---
 
-Before live Meet capture is enabled, MOM records only:
+## Badges
 
-- notes you type in the app UI, or
-- notes manually sent by extension one-shot mode.
+![Node.js](https://img.shields.io/badge/Node.js-20%2B-2f7d32)
+![Express](https://img.shields.io/badge/Express-4.x-black)
+![Auth](https://img.shields.io/badge/Auth-Token%20Based-0b6b54)
+![Queue](https://img.shields.io/badge/Queue-Retryable-1d8f74)
+![Status](https://img.shields.io/badge/Stage-Production%20MVP-0f766e)
 
-To capture conversation live, run the Google Meet extension in **live mode** (steps below) and enable Meet captions.
+---
 
-## Google Meet Live Capture Steps
+## Key Features
 
-1. Start MOM app (`npm run dev`) and login.
-2. Start a meeting in MOM and copy the `meetingId`.
-3. Open Google Meet and turn on captions.
-4. Load/refresh extension from `browser-extension/`.
-5. In extension popup:
-   - backend: `http://localhost:4000`
-   - meetingId: paste your meeting id
-   - hook key: optional
-6. Click **Start Live Capture On This Tab**.
-7. Verify Meet page shows badge: `MOM RECORDING`.
-8. End meeting in MOM and generate/send MoM.
+- Real-time meeting lifecycle (start, notes, end, MoM generation)
+- Google Meet live caption hook via browser extension
+- Automatic meeting mood inference at top of MoM
+- Insight extraction (summary, agenda highlights, decisions, action items)
+- Meeting intelligence score + keyword signal map
+- Next-meeting agenda synthesis
+- MoM version history + compare diff
+- Shareable public MoM links (read-only)
+- Async email queue with retry/backoff
+- Action reminder scheduling from open action items
+- Admin analytics, audit logs, and job visibility
 
-Important:
+---
 
-- Meet page usually does not expose participant emails reliably, so live email extraction is limited.
-- This extension is not an official Google Meet plugin; it overlays its own recording badge.
+## Demo Capabilities
+
+### 1) Live Meeting Assistant
+- Ingest typed notes or live captions
+- Generate structured MoM in seconds
+
+### 2) Delivery + Reliability
+- Queue MoM emails
+- Track status (`queued`, `processing`, `succeeded`, `failed`)
+
+### 3) Competitive Intelligence Layer
+- Score meeting quality
+- Generate next agenda automatically
+- Schedule action reminders
+
+### 4) Governance Layer
+- Auth-protected APIs
+- Audit timeline for key operations
+- Persistent state in JSON store
+
+---
 
 ## Architecture
 
-- `src/server.js`: main API server and orchestration
-- `src/auth.js`: password hashing and token auth
-- `src/persistence.js`: JSON-backed persistence (`data/mom-db.json`)
-- `src/queue.js`: email job queue + retry/backoff
-- `src/audit.js`: audit event model and retention
-- `src/transcription.js`: transcription session/chunk utilities
-- `src/platform.js`: meeting platform integration helpers
-- `public/index.html`: browser UI
-- `public/styles.css`: luxury visual system (glass cards, sticky blur nav, motion)
-- `public/app.js`: frontend logic + API orchestration
-- `browser-extension/`: extension sample for meeting context hooks
+```text
+MOM/
+├── public/
+│   ├── index.html         # Premium frontend layout
+│   ├── styles.css         # Glassmorphism + neumorphism design system
+│   └── app.js             # UI interactions + API orchestration
+├── browser-extension/
+│   ├── manifest.json
+│   ├── popup.html
+│   ├── popup.js
+│   └── content.js         # Google Meet live caption capture + recording badge
+├── src/
+│   ├── server.js          # API, auth guards, queue worker, orchestration
+│   ├── auth.js
+│   ├── persistence.js
+│   ├── queue.js
+│   ├── audit.js
+│   ├── transcription.js
+│   ├── meeting-intelligence.js
+│   ├── mom-versioning.js
+│   └── reminder-jobs.js
+├── scripts/
+│   ├── phase4-demo.ps1
+│   └── phase5-demo.ps1
+└── docs/
+    ├── PHASE5_RUNBOOK.md
+    └── COMPETITIVE_FEATURES.md
+```
 
-## Quick Start
+### System Flow (Mermaid)
 
-1. Install dependencies:
+```mermaid
+flowchart LR
+  U[User / Team] --> FE[Frontend Control Center]
+  FE --> API[Express API]
+  MEET[Google Meet + Captions] --> EXT[Browser Extension]
+  EXT --> API
+  API --> INT[Insights + Mood + Intelligence]
+  API --> MOM[MoM Generator]
+  MOM --> Q[Job Queue]
+  Q --> MAIL[SMTP Delivery]
+  API --> DB[JSON Persistence]
+  API --> AUDIT[Audit + Analytics]
+  MOM --> SHARE[Public Share Link]
+```
+
+---
+
+## Real-Time Streaming Pipeline
+
+1. Meeting starts in MOM app
+2. Extension captures live captions from Meet tab (when captions are ON)
+3. Caption batches are posted to `/api/hooks/meeting-context`
+4. Notes are normalized into speaker-aware entries
+5. End meeting triggers MoM generation + mood + insights
+6. Email delivery is queued and processed asynchronously
+
+---
+
+## Tech Stack
+
+### Frontend
+- Vanilla JS SPA (`public/index.html`, `public/app.js`)
+- Inter font
+- Phosphor icons
+- Premium visual system (glassmorphism, neumorphism, reveal animations)
+
+### Backend
+- Node.js
+- Express
+- Nodemailer v8
+- UUID
+- Dotenv
+
+### Real-Time / Integration
+- Chrome Extension (Manifest V3)
+- Google Meet caption DOM ingestion
+- Hook-based streaming into backend
+
+### Ops / Reliability
+- Persistent JSON store
+- Retryable async job worker
+- Audit + analytics endpoints
+
+---
+
+## Performance Notes
+
+Observed in local smoke runs:
+- End-to-end MoM generation: near-instant after `/end`
+- Queue processing loop interval: default `2000ms`
+- Live caption push cadence from extension: ~`1500ms` batches
+- Reminder jobs and MoM jobs both processed by same retryable worker
+
+---
+
+## Installation
 
 ```bash
+git clone https://github.com/abhay-codes07/MOM.git
+cd MOM
 npm install
-```
-
-2. Create env file:
-
-```bash
 copy .env.example .env
+npm run dev
 ```
 
-3. Start the app:
+Open: `http://localhost:4000`
+
+---
+
+## Development
+
+### Run App
 
 ```bash
 npm run dev
 ```
 
-4. Open:
+### Security/Audit Check
 
-`http://localhost:4000`
+```bash
+npm audit
+```
 
-### Frontend Navigation
+### Demo Scripts
 
-- Top nav uses anchor links to sections (`Home`, `Features`, `Pricing`, `Control`, etc.).
-- Main functional area is `Control Center`.
-- Advanced operations (calendar start, transcription, admin calls) are included inside Control Center.
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1
+powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1
+```
 
-## Default Admin Login
+---
 
-Use these only for local development (change in production):
+## API Highlights
 
-- Email: `admin@mom.local`
-- Password: `admin12345`
-
-## API Overview
-
-### Health and Auth
-
-- `GET /api/health`
+### Auth
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 
-### Integrations
-
-- `GET /api/integrations/platforms`
-- `GET /api/integrations/:platform/events?ownerEmail=...`
-- `POST /api/integrations/start-from-event`
-
 ### Meetings
-
 - `POST /api/meetings/start`
 - `POST /api/meetings/:id/notes`
-- `POST /api/meetings/:id/presence`
-- `GET /api/meetings/:id/attendance`
-- `POST /api/meetings/:id/insights`
 - `POST /api/meetings/:id/end`
 - `POST /api/meetings/:id/send-mom`
 - `POST /api/meetings/:id/share-mom`
-- `GET /api/meetings/:id/share-mom`
-- `GET /api/meetings/:id`
+
+### Intelligence Pack
 - `GET /api/meetings/:id/intelligence`
 - `GET /api/meetings/:id/agenda-next`
 - `GET /api/meetings/:id/mom-versions`
-- `GET /api/meetings/:id/mom-versions/:versionId/compare?to=latest|<versionId>`
+- `GET /api/meetings/:id/mom-versions/:versionId/compare?to=latest`
 - `POST /api/meetings/:id/schedule-reminders`
 
-### Public Share
-
-- `GET /share/mom/:shareId` (read-only public MoM page)
-
-### Transcription
-
-- `POST /api/meetings/:id/transcription/start`
-- `POST /api/meetings/:id/transcription/chunks`
-- `POST /api/meetings/:id/transcription/simulate`
-- `POST /api/meetings/:id/transcription/stop`
-- `GET /api/meetings/:id/transcription`
-- `GET /api/meetings/:id/transcription/export?format=txt|json`
-
 ### Admin
-
 - `GET /api/jobs`
-- `GET /api/jobs/:id`
 - `GET /api/admin/analytics`
-- `GET /api/admin/audit?limit=...`
-- `GET /api/admin/users`
-- `POST /api/admin/users`
+- `GET /api/admin/audit`
 
-## Demo Scripts
+---
 
-- Phase 4 flow: `powershell -ExecutionPolicy Bypass -File scripts/phase4-demo.ps1`
-- Phase 5 flow: `powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1`
+## Screenshots (Placeholders)
 
-## Production Notes
+![Hero UI](./docs/hero.png)
+![Control Center](./docs/control-center.png)
+![Shared MoM View](./docs/shared-mom.png)
+![Live Hook Extension](./docs/live-hook.png)
 
-- Set strong values for `AUTH_SECRET` and `ADMIN_PASSWORD`
-- Keep `AUTH_REQUIRED=true`
-- Configure SMTP values for real email delivery
-- Persist `DATA_DIR` on durable storage
-- See [docs/PHASE5_RUNBOOK.md](docs/PHASE5_RUNBOOK.md)
-- Competitive workflows: [docs/COMPETITIVE_FEATURES.md](docs/COMPETITIVE_FEATURES.md)
+---
+
+## Roadmap
+
+- Native provider connectors beyond Meet DOM capture
+- Better speaker diarization and confidence scoring
+- Team workspaces + role-based access controls
+- Database backend migration (Postgres)
+- Production observability dashboards and alerting
+- Scheduled recurring meeting playbooks
+
+---
+
+## Contributing
+
+Contributions are welcome.  
+For major changes, open an issue first with scope, use-case, and expected API/UI behavior.
+
+---
+
+## Contributors
+
+- **Abhay Singh** (Project Owner)  
+  GitHub: `@abhay-codes07`
+
+---
+
+## License
+
+MIT License.
+
+---
+
+Built for high-velocity teams that want decisions, accountability, and operational clarity from every meeting.
