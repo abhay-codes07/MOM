@@ -24,7 +24,8 @@
     const ids = [
       "noteBtn", "insightsBtn", "endBtn", "presenceBtn", "attendanceBtn", "txStartBtn", "txChunkBtn", "txSimBtn",
       "txStopBtn", "txStatusBtn", "txExportBtn", "sendBtn", "shareCreateBtn", "shareViewBtn",
-      "intelligenceBtn", "nextAgendaBtn", "momVersionsBtn", "momCompareLatestBtn", "scheduleRemindersBtn"
+      "intelligenceBtn", "riskRadarBtn", "nextAgendaBtn", "followupDraftsBtn", "momVersionsBtn",
+      "momCompareLatestBtn", "scheduleRemindersBtn"
     ];
     for (const id of ids) {
       const el = document.getElementById(id);
@@ -315,6 +316,26 @@
       setStatus(data);
     } catch (e) {
       setStatus(`Next agenda failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("riskRadarBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const data = await callApi(`/api/meetings/${meetingId}/risk-radar`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`Risk radar failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("followupDraftsBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const data = await callApi(`/api/meetings/${meetingId}/followup-drafts`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`Follow-up drafts failed: ${e.message}`);
     }
   });
 
