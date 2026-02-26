@@ -46,6 +46,9 @@ It is built to convert meeting noise into structured outcomes:
 - Automatic meeting mood inference at top of MoM
 - Insight extraction (summary, agenda highlights, decisions, action items)
 - Meeting intelligence score + keyword signal map
+- AI risk radar from conversational signals
+- AI follow-up draft generator for attendee emails
+- Smart action parsing (owner + due hint extraction)
 - Next-meeting agenda synthesis
 - MoM version history + compare diff
 - Shareable public MoM links (read-only)
@@ -67,7 +70,9 @@ It is built to convert meeting noise into structured outcomes:
 
 ### 3) Competitive Intelligence Layer
 - Score meeting quality
+- Surface medium/high risk signals early
 - Generate next agenda automatically
+- Draft follow-up emails for attendees
 - Schedule action reminders
 
 ### 4) Governance Layer
@@ -98,6 +103,7 @@ MOM/
 │   ├── audit.js
 │   ├── transcription.js
 │   ├── meeting-intelligence.js
+│   ├── ai-ops.js
 │   ├── mom-versioning.js
 │   └── reminder-jobs.js
 ├── scripts/
@@ -228,6 +234,8 @@ powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1
 ### Intelligence Pack
 - `GET /api/meetings/:id/intelligence`
 - `GET /api/meetings/:id/agenda-next`
+- `GET /api/meetings/:id/risk-radar`
+- `GET /api/meetings/:id/followup-drafts`
 - `GET /api/meetings/:id/mom-versions`
 - `GET /api/meetings/:id/mom-versions/:versionId/compare?to=latest`
 - `POST /api/meetings/:id/schedule-reminders`
