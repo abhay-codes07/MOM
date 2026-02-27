@@ -24,7 +24,7 @@
     const ids = [
       "noteBtn", "insightsBtn", "endBtn", "presenceBtn", "attendanceBtn", "txStartBtn", "txChunkBtn", "txSimBtn",
       "txStopBtn", "txStatusBtn", "txExportBtn", "sendBtn", "shareCreateBtn", "shareViewBtn",
-      "intelligenceBtn", "riskRadarBtn", "nextAgendaBtn", "followupDraftsBtn", "momVersionsBtn",
+      "intelligenceBtn", "riskRadarBtn", "conflictMapBtn", "nextAgendaBtn", "followupDraftsBtn", "momVersionsBtn",
       "momCompareLatestBtn", "scheduleRemindersBtn"
     ];
     for (const id of ids) {
@@ -326,6 +326,16 @@
       setStatus(data);
     } catch (e) {
       setStatus(`Risk radar failed: ${e.message}`);
+    }
+  });
+
+  document.getElementById("conflictMapBtn")?.addEventListener("click", async () => {
+    try {
+      if (!meetingId) throw new Error("Start meeting first");
+      const data = await callApi(`/api/meetings/${meetingId}/conflict-map`, "GET");
+      setStatus(data);
+    } catch (e) {
+      setStatus(`Conflict map failed: ${e.message}`);
     }
   });
 

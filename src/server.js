@@ -19,7 +19,7 @@ const { createAuditEvent, appendAudit } = require("./audit");
 const { getTopKeywords, computeMeetingScore, buildNextAgenda } = require("./meeting-intelligence");
 const { appendMomVersion, diffMomText } = require("./mom-versioning");
 const { createReminderJobsFromInsights } = require("./reminder-jobs");
-const { parseActionItemFromText, buildRiskRadar, buildFollowupDrafts } = require("./ai-ops");
+const { parseActionItemFromText, buildRiskRadar, buildFollowupDrafts, buildConflictMap } = require("./ai-ops");
 const {
   createEmailJob,
   markJobProcessing,
@@ -904,7 +904,12 @@ app.get("/api/meetings/:id/intelligence", (req, res) => {
   }
 
   const intelligence = buildMeetingIntelligence(meeting);
-  return res.json({ id: meeting.id, intelligence, riskRadar: buildRiskRadar(meeting.notes) });
+  return res.json({
+    id: meeting.id,
+    intelligence,
+    riskRadar: buildRiskRadar(meeting.notes),
+    conflictMap: buildConflictMap(meeting.notes)
+  });
 });
 
 app.get("/api/meetings/:id/agenda-next", (req, res) => {
@@ -939,6 +944,16 @@ app.get("/api/meetings/:id/followup-drafts", (req, res) => {
 
   const drafts = buildFollowupDrafts(meeting, meeting.insights);
   return res.json({ id: meeting.id, drafts });
+});
+
+app.get("/api/meetings/:id/conflict-map", (req, res) => {
+  const meeting = meetings.get(req.params.id);
+  if (!meeting) {
+    return res.status(404).json({ message: "Meeting not found" });
+  }
+
+  const conflictMap = buildConflictMap(meeting.notes);
+  return res.json({ id: meeting.id, conflictMap });
 });
 
 app.get("/api/meetings/:id/mom-versions", (req, res) => {

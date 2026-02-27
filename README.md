@@ -47,6 +47,7 @@ It is built to convert meeting noise into structured outcomes:
 - Insight extraction (summary, agenda highlights, decisions, action items)
 - Meeting intelligence score + keyword signal map
 - AI risk radar from conversational signals
+- AI conflict map to detect contradictory decisions/statements
 - AI follow-up draft generator for attendee emails
 - Smart action parsing (owner + due hint extraction)
 - Next-meeting agenda synthesis
@@ -235,6 +236,7 @@ powershell -ExecutionPolicy Bypass -File scripts/phase5-demo.ps1
 - `GET /api/meetings/:id/intelligence`
 - `GET /api/meetings/:id/agenda-next`
 - `GET /api/meetings/:id/risk-radar`
+- `GET /api/meetings/:id/conflict-map`
 - `GET /api/meetings/:id/followup-drafts`
 - `GET /api/meetings/:id/mom-versions`
 - `GET /api/meetings/:id/mom-versions/:versionId/compare?to=latest`

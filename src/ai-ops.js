@@ -123,8 +123,80 @@ function buildFollowupDrafts(meeting, insights) {
   return drafts;
 }
 
+function extractKeywords(text) {
+  return normalize(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 5)
+    .slice(0, 10);
+}
+
+function detectPolarity(text) {
+  const t = normalize(text).toLowerCase();
+  const positive = ["approve", "agreed", "go with", "enable", "increase", "adopt", "accept", "proceed"];
+  const negative = ["reject", "decline", "drop", "disable", "decrease", "avoid", "rollback", "block"];
+
+  let p = 0;
+  let n = 0;
+  for (const token of positive) {
+    if (t.includes(token)) p += 1;
+  }
+  for (const token of negative) {
+    if (t.includes(token)) n += 1;
+  }
+  if (p === n) return 0;
+  return p > n ? 1 : -1;
+}
+
+function buildConflictMap(notes) {
+  const keywordStances = new Map();
+
+  for (const note of notes) {
+    const text = normalize(note.text || "");
+    if (!text) continue;
+    const polarity = detectPolarity(text);
+    if (polarity === 0) continue;
+
+    const keywords = extractKeywords(text);
+    for (const keyword of keywords) {
+      const arr = keywordStances.get(keyword) || [];
+      arr.push({
+        polarity,
+        speaker: note.speaker || "Participant",
+        text
+      });
+      keywordStances.set(keyword, arr);
+    }
+  }
+
+  const conflicts = [];
+  for (const [keyword, entries] of keywordStances.entries()) {
+    const hasPositive = entries.some((e) => e.polarity === 1);
+    const hasNegative = entries.some((e) => e.polarity === -1);
+    if (!hasPositive || !hasNegative) continue;
+
+    conflicts.push({
+      topic: keyword,
+      positive: entries.filter((e) => e.polarity === 1).slice(0, 3),
+      negative: entries.filter((e) => e.polarity === -1).slice(0, 3)
+    });
+  }
+
+  const severity = conflicts.length >= 4 ? "high" : conflicts.length >= 2 ? "medium" : conflicts.length >= 1 ? "low" : "none";
+  const confidence = Math.min(0.95, 0.35 + conflicts.length * 0.12);
+
+  return {
+    severity,
+    conflictCount: conflicts.length,
+    confidence: Number(confidence.toFixed(2)),
+    conflicts: conflicts.slice(0, 12)
+  };
+}
+
 module.exports = {
   parseActionItemFromText,
   buildRiskRadar,
-  buildFollowupDrafts
+  buildFollowupDrafts,
+  buildConflictMap
 };
