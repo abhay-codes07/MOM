@@ -3,41 +3,173 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MOM Hook</title>
+    <title>MOM AI</title>
     <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        font-family: Segoe UI, sans-serif;
-        width: 300px;
-        margin: 0;
-        padding: 12px;
+        font-family: Segoe UI, system-ui, sans-serif;
+        width: 320px;
+        background: #0f1117;
+        color: #e4e8ef;
+        font-size: 13px;
       }
-      input, textarea, button {
-        width: 100%;
-        box-sizing: border-box;
-        margin-top: 8px;
+      .header {
+        display: flex; align-items: center; gap: 8px;
+        padding: 12px 14px 10px;
+        border-bottom: 1px solid #1e2330;
+        background: #141824;
       }
+      .header h1 { font-size: 15px; font-weight: 700; color: #fff; }
+      .header .badge {
+        margin-left: auto; font-size: 10px; font-weight: 700;
+        background: #0d6b54; color: #fff; padding: 2px 7px; border-radius: 999px;
+      }
+      .badge.off { background: #c0392b; }
+
+      section {
+        padding: 10px 14px;
+        border-bottom: 1px solid #1e2330;
+      }
+      section:last-child { border-bottom: none; }
+      .section-title {
+        font-size: 10px; font-weight: 700; letter-spacing: .08em;
+        text-transform: uppercase; color: #6b7a99; margin-bottom: 8px;
+      }
+
+      label { display: block; font-size: 11px; color: #9aa3b8; margin-bottom: 3px; margin-top: 6px; }
+      label:first-child { margin-top: 0; }
+
+      input, textarea, select {
+        width: 100%; padding: 7px 9px;
+        background: #1a1f2e; border: 1px solid #2a3145;
+        border-radius: 6px; color: #e4e8ef; font-size: 12px;
+        outline: none;
+      }
+      input:focus, textarea:focus { border-color: #0d6b54; }
+      textarea { resize: vertical; min-height: 48px; }
+
+      .row { display: flex; gap: 6px; }
+      .row button { flex: 1; }
+
       button {
-        padding: 8px;
+        width: 100%; padding: 7px 10px; margin-top: 6px;
+        background: #1a2535; border: 1px solid #2a3145;
+        border-radius: 6px; color: #e4e8ef; font-size: 12px;
+        cursor: pointer; font-weight: 600; transition: background .15s;
       }
+      button:hover { background: #222d42; }
+      button.primary { background: #0d6b54; border-color: #0d6b54; color: #fff; }
+      button.primary:hover { background: #0f7d62; }
+      button.danger { background: #7a1818; border-color: #7a1818; color: #fff; }
+      button.danger:hover { background: #8f1e1e; }
+
+      .toggle-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 6px 0;
+      }
+      .toggle-label { font-size: 12px; color: #c4cfe0; }
+      .toggle-sub { font-size: 10px; color: #6b7a99; margin-top: 1px; }
+
+      /* Toggle switch */
+      .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .slider {
+        position: absolute; inset: 0; background: #2a3145;
+        border-radius: 20px; cursor: pointer; transition: background .2s;
+      }
+      .slider::before {
+        content: ""; position: absolute;
+        height: 14px; width: 14px; left: 3px; bottom: 3px;
+        background: #fff; border-radius: 50%; transition: transform .2s;
+      }
+      input:checked + .slider { background: #0d6b54; }
+      input:checked + .slider::before { transform: translateX(16px); }
+
       #status {
-        white-space: pre-wrap;
-        margin-top: 8px;
-        font-size: 12px;
+        white-space: pre-wrap; font-size: 11px; color: #6b7a99;
+        padding: 8px 14px; min-height: 28px;
+        border-top: 1px solid #1e2330;
+        background: #0c1018;
       }
     </style>
   </head>
   <body>
-    <h3>MOM Live Hook</h3>
-    <input id="backend" placeholder="Backend URL (http://localhost:4000)" value="http://localhost:4000" />
-    <input id="meetingId" placeholder="Meeting ID from MOM app" />
-    <input id="hookKey" placeholder="Optional Hook API key" />
-    <button id="startLiveBtn">Start Live Capture On This Tab</button>
-    <button id="stopLiveBtn">Stop Live Capture</button>
-    <hr />
-    <textarea id="participants" rows="3" placeholder="Manual participants: name,email per line"></textarea>
-    <textarea id="note" rows="3" placeholder="Manual one-shot note"></textarea>
-    <button id="sendBtn">Send One-Shot Context</button>
-    <div id="status">Idle</div>
+    <div class="header">
+      <h1>MOM AI</h1>
+      <span class="badge off" id="headerBadge">OFF</span>
+    </div>
+
+    <!-- Settings -->
+    <section>
+      <div class="section-title">Settings</div>
+      <label>Backend URL</label>
+      <input id="backend" placeholder="http://localhost:4000" />
+      <label>Your Email</label>
+      <input id="userEmail" type="email" placeholder="you@company.com" />
+      <label>Hook API Key (optional)</label>
+      <input id="hookKey" placeholder="Optional secret" />
+    </section>
+
+    <!-- Auth -->
+    <section>
+      <div class="section-title">Authentication</div>
+      <label>Email</label>
+      <input id="loginEmail" type="email" placeholder="admin@mom.local" />
+      <label>Password</label>
+      <input id="loginPassword" type="password" placeholder="••••••••" />
+      <div class="row">
+        <button class="primary" id="loginBtn">Login &amp; Save Token</button>
+        <button id="logoutBtn">Logout</button>
+      </div>
+      <div id="authStatus" style="font-size:11px;color:#6b7a99;margin-top:6px;"></div>
+    </section>
+
+    <!-- Auto Mode -->
+    <section>
+      <div class="section-title">Auto Mode</div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Auto Start/Stop</div>
+          <div class="toggle-sub">Detect Meet join/leave automatically</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="autoModeToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row" style="margin-top:4px;">
+        <div>
+          <div class="toggle-label">Audio Capture</div>
+          <div class="toggle-sub">Record tab audio → AI transcription</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="audioCaptureToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Manual Controls -->
+    <section>
+      <div class="section-title">Manual Controls</div>
+      <label>Meeting ID</label>
+      <input id="meetingId" placeholder="Meeting ID from MOM app" />
+      <div class="row">
+        <button class="primary" id="startLiveBtn">Start Capture</button>
+        <button class="danger" id="stopLiveBtn">Stop</button>
+      </div>
+      <button id="startAudioBtn" style="margin-top:4px;">Start Audio Capture (this tab)</button>
+    </section>
+
+    <!-- One-shot -->
+    <section>
+      <div class="section-title">One-Shot Note</div>
+      <textarea id="participants" rows="2" placeholder="participants: name,email per line"></textarea>
+      <textarea id="note" rows="2" placeholder="Manual note text"></textarea>
+      <button id="sendBtn">Send Note</button>
+    </section>
+
+    <div id="status">Ready.</div>
     <script src="popup.js"></script>
   </body>
 </html>

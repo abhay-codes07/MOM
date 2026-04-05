@@ -1,9 +1,17 @@
 {
   "manifest_version": 3,
   "name": "MOM Meeting Context Hook",
-  "version": "0.2.0",
-  "description": "Captures meeting context and live captions to MOM backend.",
-  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "version": "0.3.0",
+  "description": "Captures meeting context, live captions, and audio to MOM backend. Auto-starts/ends meetings.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "tabCapture",
+    "offscreen",
+    "notifications"
+  ],
   "host_permissions": [
     "http://localhost:4000/*",
     "http://127.0.0.1:4000/*",
@@ -11,6 +19,9 @@
     "https://*.zoom.us/*",
     "https://teams.microsoft.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://meet.google.com/*"],
@@ -19,7 +30,7 @@
     }
   ],
   "action": {
-    "default_title": "Send Context",
+    "default_title": "MOM AI",
     "default_popup": "popup.html"
   }
 }

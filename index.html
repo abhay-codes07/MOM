@@ -1,0 +1,15 @@
+<html>
+    <h1 id="header" >List King</h1>
+</html>
+<ul>
+    <li id="one" class="hot">Fresh Figs</li>
+</ul>
+<script>
+    var firstItem = document.getElementById("one");
+    var showTextContent= firstItem.textContent;
+    var showInnerText = firstItem.innerText;
+    console.log("textContent: " + showTextContent);
+    console.log("innerText: " + showInnerText);
+    firstItem.innerText = "Dried Figs";
+</script>
+</html>

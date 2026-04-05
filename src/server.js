@@ -20,6 +20,7 @@ const { getTopKeywords, computeMeetingScore, buildNextAgenda } = require("./meet
 const { appendMomVersion, diffMomText } = require("./mom-versioning");
 const { createReminderJobsFromInsights } = require("./reminder-jobs");
 const { parseActionItemFromText, buildRiskRadar, buildFollowupDrafts, buildConflictMap } = require("./ai-ops");
+const llm = require("./llm");
 const {
   createEmailJob,
   markJobProcessing,
@@ -354,6 +355,134 @@ ${attendanceBlock}
 Discussion Notes:
 ${noteLines || "No notes captured."}`;
 }
+
+// ─── AI-powered async wrappers (fall back to rule-based when no API key) ─────
+
+async function extractInsightsWithAI(notes, meetingTitle = "", attendees = []) {
+  if (!llm.isConfigured() || notes.length === 0) {
+    return extractInsights(notes);
+  }
+  const notesText = notes
+    .map((n, i) => `[${i + 1}] ${n.speaker || "Participant"}: ${normalizeSentence(n.text || "")}`)
+    .join("\n");
+  const raw = await llm.complete(
+    `You are a meeting intelligence assistant. Extract structured insights from meeting notes.
+Always respond with valid JSON only — no markdown, no explanation.`,
+    `Meeting: "${meetingTitle}"
+Attendees: ${attendees.join(", ")}
+
+Notes:
+${notesText}
+
+Return JSON with these exact fields:
+{
+  "summary": ["<key sentence 1>", ...],
+  "agenda": ["<agenda item>", ...],
+  "decisions": ["<Speaker: decision>", ...],
+  "actionItems": [{ "item": "<text>", "owner": "<name>", "due": "<date or null>", "status": "open" }],
+  "speakerStats": [{ "speaker": "<name>", "notes": <count>, "words": <count> }]
+}`
+  );
+  const parsed = llm.parseJSON(raw);
+  if (
+    parsed &&
+    Array.isArray(parsed.summary) &&
+    Array.isArray(parsed.actionItems) &&
+    Array.isArray(parsed.speakerStats)
+  ) {
+    return {
+      summary: parsed.summary.slice(0, 6),
+      agenda: (parsed.agenda || []).slice(0, 6),
+      decisions: (parsed.decisions || []).slice(0, 8),
+      actionItems: (parsed.actionItems || []).slice(0, 12).map(a => ({
+        item: a.item || "",
+        owner: a.owner || "Participant",
+        due: a.due || null,
+        status: a.status || "open"
+      })),
+      speakerStats: parsed.speakerStats || []
+    };
+  }
+  return extractInsights(notes);
+}
+
+async function inferMoodWithAI(notes) {
+  if (!llm.isConfigured() || notes.length === 0) {
+    return inferMeetingMood(notes);
+  }
+  const notesText = notes
+    .slice(-60)
+    .map(n => `${n.speaker || "Participant"}: ${normalizeSentence(n.text || "")}`)
+    .join("\n");
+  const raw = await llm.complete(
+    `You are a meeting sentiment analyst. Analyze the overall mood of a meeting.
+Always respond with valid JSON only — no markdown, no explanation.`,
+    `Meeting notes:
+${notesText}
+
+Return JSON: { "label": "<Positive|Neutral|Concerned>", "confidence": <0.0-1.0>, "rationale": "<one sentence>" }`
+  );
+  const parsed = llm.parseJSON(raw);
+  if (parsed && ["Positive", "Neutral", "Concerned"].includes(parsed.label)) {
+    return {
+      label: parsed.label,
+      confidence: Number((parsed.confidence || 0.7).toFixed(2)),
+      rationale: parsed.rationale || ""
+    };
+  }
+  return inferMeetingMood(notes);
+}
+
+async function generateMomWithAI(meeting) {
+  if (!llm.isConfigured() || meeting.notes.length === 0) {
+    return generateMom(meeting);
+  }
+  const transcript = meeting.notes
+    .map((n, i) => `[${i + 1}] [${n.timestamp}] ${n.speaker || "Participant"}: ${normalizeSentence(n.text || "")}`)
+    .join("\n");
+  const raw = await llm.complete(
+    `You are a professional meeting secretary. Generate formal, structured Minutes of Meeting documents.
+Write in a professional tone. Be comprehensive and actionable.`,
+    `Meeting Title: ${meeting.title}
+Meeting ID: ${meeting.id}
+Start: ${meeting.startedAt}
+End: ${meeting.endedAt || "In progress"}
+Attendees: ${meeting.attendees.join(", ")}
+Platform: ${meeting.platform}
+Meeting Link: ${meeting.meetingLink || "Not provided"}
+
+Full Transcript:
+${transcript}
+
+Generate a complete Minutes of Meeting with these sections:
+1. Minutes of Meeting (header)
+2. Meeting Overview (title, date, attendees, platform)
+3. Overall Meeting Mood (label + rationale)
+4. Executive Summary (4-6 key points as bullet list)
+5. Decisions Made (bullet list)
+6. Action Items (each with owner and due date if mentioned)
+7. Discussion Highlights (key moments)
+8. Speaker Participation Statistics
+9. Next Steps
+
+Format as plain text starting with "Minutes of Meeting" on the first line.`
+  );
+  if (raw && raw.trim().length > 100) {
+    return raw.trim();
+  }
+  return generateMom(meeting);
+}
+
+async function buildMeetingIntelligenceAsync(meeting) {
+  const insights = meeting.insights || await extractInsightsWithAI(meeting.notes, meeting.title, meeting.attendees);
+  const mood = await inferMoodWithAI(meeting.notes);
+  const topKeywords = getTopKeywords(meeting.notes, 15);
+  const score = computeMeetingScore(meeting, insights, mood);
+  const nextAgenda = await buildNextAgenda(meeting, insights, 6);
+  return { mood, score, topKeywords, nextAgenda };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function getMeetingByShareId(shareId) {
   for (const meeting of meetings.values()) {
@@ -843,7 +972,7 @@ app.post("/api/hooks/meeting-context", (req, res) => {
   });
 });
 
-app.post("/api/meetings/:id/end", (req, res) => {
+app.post("/api/meetings/:id/end", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
@@ -861,12 +990,12 @@ app.post("/api/meetings/:id/end", (req, res) => {
     clearInterval(transcriptionTimers.get(meeting.id));
     transcriptionTimers.delete(meeting.id);
   }
-  meeting.insights = extractInsights(meeting.notes);
-  meeting.mom = generateMom(meeting);
+  meeting.insights = await extractInsightsWithAI(meeting.notes, meeting.title, meeting.attendees);
+  meeting.mom = await generateMomWithAI(meeting);
   appendMomVersion(meeting, meeting.mom, "meeting_end");
 
   bump("meetingEnded");
-  recordAudit("meeting.end", req, meeting.id, { notes: meeting.notes.length });
+  recordAudit("meeting.end", req, meeting.id, { notes: meeting.notes.length, aiPowered: llm.isConfigured() });
   persistState();
 
   return res.json({
@@ -878,15 +1007,15 @@ app.post("/api/meetings/:id/end", (req, res) => {
   });
 });
 
-app.post("/api/meetings/:id/insights", (req, res) => {
+app.post("/api/meetings/:id/insights", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
 
-  meeting.insights = extractInsights(meeting.notes);
+  meeting.insights = await extractInsightsWithAI(meeting.notes, meeting.title, meeting.attendees);
   if (!meeting.isActive) {
-    meeting.mom = generateMom(meeting);
+    meeting.mom = await generateMomWithAI(meeting);
     appendMomVersion(meeting, meeting.mom, "insights_refresh");
   }
 
@@ -897,64 +1026,119 @@ app.post("/api/meetings/:id/insights", (req, res) => {
   });
 });
 
-app.get("/api/meetings/:id/intelligence", (req, res) => {
+app.get("/api/meetings/:id/intelligence", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
 
-  const intelligence = buildMeetingIntelligence(meeting);
-  return res.json({
-    id: meeting.id,
-    intelligence,
-    riskRadar: buildRiskRadar(meeting.notes),
-    conflictMap: buildConflictMap(meeting.notes)
-  });
+  const [intelligence, riskRadar, conflictMap] = await Promise.all([
+    buildMeetingIntelligenceAsync(meeting),
+    buildRiskRadar(meeting.notes),
+    buildConflictMap(meeting.notes)
+  ]);
+  return res.json({ id: meeting.id, intelligence, riskRadar, conflictMap });
 });
 
-app.get("/api/meetings/:id/agenda-next", (req, res) => {
+app.get("/api/meetings/:id/agenda-next", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
 
-  const intelligence = buildMeetingIntelligence(meeting);
+  const intelligence = await buildMeetingIntelligenceAsync(meeting);
   return res.json({ id: meeting.id, agenda: intelligence.nextAgenda });
 });
 
-app.get("/api/meetings/:id/risk-radar", (req, res) => {
+app.get("/api/meetings/:id/risk-radar", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
 
-  const radar = buildRiskRadar(meeting.notes);
+  const radar = await buildRiskRadar(meeting.notes);
   return res.json({ id: meeting.id, riskRadar: radar });
 });
 
-app.get("/api/meetings/:id/followup-drafts", (req, res) => {
+app.get("/api/meetings/:id/followup-drafts", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
 
   if (!meeting.insights) {
-    meeting.insights = extractInsights(meeting.notes);
+    meeting.insights = await extractInsightsWithAI(meeting.notes, meeting.title, meeting.attendees);
   }
 
-  const drafts = buildFollowupDrafts(meeting, meeting.insights);
+  const drafts = await buildFollowupDrafts(meeting, meeting.insights);
   return res.json({ id: meeting.id, drafts });
 });
 
-app.get("/api/meetings/:id/conflict-map", (req, res) => {
+app.get("/api/meetings/:id/conflict-map", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
 
-  const conflictMap = buildConflictMap(meeting.notes);
+  const conflictMap = await buildConflictMap(meeting.notes);
   return res.json({ id: meeting.id, conflictMap });
 });
+
+// Audio chunk endpoint — receives raw audio blob from the Chrome extension offscreen recorder,
+// transcribes it via Groq Whisper or Gemini, and adds the result as meeting notes.
+app.post("/api/meetings/:id/audio-chunk",
+  requireAuth,
+  express.raw({ type: ["audio/*", "application/octet-stream"], limit: "25mb" }),
+  async (req, res) => {
+    const meeting = meetings.get(req.params.id);
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    const audioBuffer = req.body;
+    if (!Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) {
+      return res.status(400).json({ message: "Audio body is empty" });
+    }
+
+    const mimeType = String(req.headers["content-type"] || "audio/webm").split(";")[0];
+
+    if (!llm.isConfigured()) {
+      return res.json({ ok: true, notesAdded: 0, reason: "no_ai_provider" });
+    }
+
+    const transcript = await llm.transcribeAudio(audioBuffer, mimeType);
+    if (!transcript || !transcript.trim()) {
+      return res.json({ ok: true, notesAdded: 0 });
+    }
+
+    // Split into per-speaker lines where possible
+    const lines = transcript.split("\n").map(l => l.trim()).filter(Boolean);
+    let notesAdded = 0;
+
+    for (const line of lines) {
+      if (line.length < 4) continue;
+      // Try to detect "Speaker N: text" or "Name: text" pattern
+      const speakerMatch = line.match(/^([^:]{1,50}):\s*(.+)$/);
+      const noteEntry = {
+        id: uuidv4(),
+        speaker: speakerMatch ? speakerMatch[1].trim() : "Meeting Audio",
+        text: speakerMatch ? speakerMatch[2].trim() : line,
+        timestamp: new Date().toISOString(),
+        source: "audio_transcription"
+      };
+      meeting.notes.push(noteEntry);
+      bump("notesCreated");
+      notesAdded++;
+    }
+
+    if (notesAdded > 0) {
+      recordAudit("transcription.audio_chunk", req, meeting.id, { notesAdded, provider: llm.activeProvider() });
+      persistState();
+    }
+
+    return res.json({ ok: true, notesAdded });
+  }
+);
 
 app.get("/api/meetings/:id/mom-versions", (req, res) => {
   const meeting = meetings.get(req.params.id);
@@ -992,13 +1176,13 @@ app.get("/api/meetings/:id/mom-versions/:versionId/compare", (req, res) => {
   });
 });
 
-app.post("/api/meetings/:id/schedule-reminders", (req, res) => {
+app.post("/api/meetings/:id/schedule-reminders", async (req, res) => {
   const meeting = meetings.get(req.params.id);
   if (!meeting) {
     return res.status(404).json({ message: "Meeting not found" });
   }
   if (!meeting.insights) {
-    meeting.insights = extractInsights(meeting.notes);
+    meeting.insights = await extractInsightsWithAI(meeting.notes, meeting.title, meeting.attendees);
   }
 
   const { fromEmail, daysAhead } = req.body || {};
